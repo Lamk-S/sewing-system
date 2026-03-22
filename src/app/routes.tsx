@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import AdminRoute from '../routes/AdminRoute'
-import Login from '../components/auth/Login'
+import Login from '../auth/Login'
 
 import RegistroTrabajador from '../features/production/RegistroTrabajador'
 import TurnoManager from '../features/production/TurnoManager'
