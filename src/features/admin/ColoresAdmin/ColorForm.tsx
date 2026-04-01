@@ -12,11 +12,11 @@ type Props = {
 export function ColorForm({ color, onClose }: Props) {
   const { createColor, updateColor, loading } = useAdmin()
 
-  const [formData, setFormData] = useState(() => ({
+  const [formData, setFormData] = useState({
     nombre: color?.nombre ?? '',
     codigo_hex: color?.codigo_hex ?? '#000000',
     activo: color?.activo ?? true,
-  }))
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,128 +29,85 @@ export function ColorForm({ color, onClose }: Props) {
       }
 
       onClose()
-
     } catch (error) {
-      console.error('Error:', error)
+      console.error(error)
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        
         <h3 className="text-xl font-bold mb-4">
           {color ? 'Editar Color' : 'Nuevo Color'}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
+          
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Nombre
-            </label>
-
+            <label className="block text-sm font-medium mb-1">Nombre</label>
             <input
-              type="text"
               value={formData.nombre}
               onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  nombre: e.target.value,
-                })
+                setFormData({ ...formData, nombre: e.target.value })
               }
-              className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-green-500"
+              placeholder="Ej. Rojo Pasión"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Código HEX
-            </label>
-
-            <div className="flex gap-2">
-
+            <label className="block text-sm font-medium mb-1">Código Hexadecimal</label>
+            <div className="flex items-center gap-3">
               <input
                 type="color"
-                value={formData.codigo_hex}
+                value={formData.codigo_hex ?? '#000000'}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    codigo_hex: e.target.value,
-                  })
+                  setFormData({ ...formData, codigo_hex: e.target.value })
                 }
-                className="w-12 h-12 p-1 border rounded-lg"
+                className="w-12 h-10 cursor-pointer"
               />
-
-              <input
-                type="text"
-                value={formData.codigo_hex}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    codigo_hex: e.target.value,
-                  })
-                }
-                className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                placeholder="#000000"
-              />
-
+              <span className="font-mono text-gray-600 uppercase">
+                {formData.codigo_hex}
+              </span>
             </div>
-
-            <div
-              className="w-full h-12 mt-2 rounded-lg border"
-              style={{ backgroundColor: formData.codigo_hex }}
-            />
-
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center pt-2">
             <input
-              id="activo"
+              id="activo-color"
               type="checkbox"
-              checked={formData.activo}
+              checked={formData.activo ?? false}
               onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  activo: e.target.checked,
-                })
+                setFormData({ ...formData, activo: e.target.checked })
               }
-              className="rounded"
+              className="rounded text-green-600 focus:ring-green-500"
             />
-
-            <label htmlFor="activo" className="ml-2 text-sm">
+            <label htmlFor="activo-color" className="ml-2 text-sm font-medium cursor-pointer">
               Activo
             </label>
           </div>
 
-          <div className="flex gap-2 pt-4">
-
+          <div className="flex gap-2 pt-4 border-t mt-4">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
+              className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
             >
-              {loading
-                ? 'Guardando...'
-                : color
-                  ? 'Actualizar'
-                  : 'Crear'}
+              {loading ? 'Guardando...' : color ? 'Actualizar' : 'Crear'}
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 py-2 px-4 rounded-lg hover:bg-gray-300"
+              className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
             >
               Cancelar
             </button>
-
           </div>
 
         </form>
-
       </div>
     </div>
   )

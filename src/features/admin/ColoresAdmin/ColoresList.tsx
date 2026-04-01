@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAdmin } from '../../../shared/hooks/useAdmin'
 import { DataTable } from '../../../shared/components/ui/DataTable'
 import { ColorForm } from './ColorForm'
@@ -7,20 +7,10 @@ import type { Database } from '../../../types/supabase'
 type Color = Database['public']['Tables']['colores']['Row']
 
 export default function ColoresList() {
-  const { getColores, deleteColor, loading } = useAdmin()
+  const { colores, deleteColor, loading, refetchColores } = useAdmin()
 
-  const [colores, setColores] = useState<Color[]>([])
   const [editingColor, setEditingColor] = useState<Color | null>(null)
   const [showForm, setShowForm] = useState(false)
-
-  useEffect(() => {
-    const fetchColores = async () => {
-      const { data } = await getColores()
-      setColores(data ?? [])
-    }
-
-    fetchColores()
-  }, [getColores])
 
   const columns = [
     {
@@ -49,12 +39,10 @@ export default function ColoresList() {
   ]
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este color?')) return
+    if (!confirm('¿Eliminar este color?')) return
 
     await deleteColor(id)
-
-    const { data } = await getColores()
-    setColores(data ?? [])
+    await refetchColores()
   }
 
   return (
@@ -91,9 +79,7 @@ export default function ColoresList() {
           onClose={async () => {
             setShowForm(false)
             setEditingColor(null)
-
-            const { data } = await getColores()
-            setColores(data ?? [])
+            await refetchColores()
           }}
         />
       )}
