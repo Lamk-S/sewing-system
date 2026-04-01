@@ -21,7 +21,7 @@ type Prenda = {
 
 export default function OperacionesList() {
 
-  const { getOperaciones, deleteOperacion, loading } = useAdmin()
+  const { deleteOperacion, loading } = useAdmin()
 
   const [operaciones, setOperaciones] = useState<Operacion[]>([])
   const [editingOperacion, setEditingOperacion] = useState<Operacion | null>(null)
@@ -29,9 +29,14 @@ export default function OperacionesList() {
   const [prendas, setPrendas] = useState<Prenda[]>([])
 
   const fetchOperaciones = useCallback(async () => {
-    const { data } = await getOperaciones()
-    setOperaciones((data as Operacion[]) || [])
-  }, [getOperaciones])
+    const { data } = await supabase
+      .from('operaciones')
+      .select('*, prenda:prendas(id, nombre, codigo)')
+      .order('nombre')
+      
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setOperaciones((data as any) || [])
+  }, [])
 
   const fetchPrendas = useCallback(async () => {
     const { data } = await supabase

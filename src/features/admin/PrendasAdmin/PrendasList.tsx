@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAdmin } from '../../../shared/hooks/useAdmin'
 import { DataTable } from '../../../shared/components/ui/DataTable'
 import { PrendaForm } from './PrendaForm'
@@ -7,20 +7,10 @@ import type { Database } from '../../../types/supabase'
 type Prenda = Database['public']['Tables']['prendas']['Row']
 
 export default function PrendasList() {
-  const { getPrendas, deletePrenda, loading } = useAdmin()
+  const { prendas, deletePrenda, loading } = useAdmin()
 
-  const [prendas, setPrendas] = useState<Prenda[]>([])
   const [editingPrenda, setEditingPrenda] = useState<Prenda | null>(null)
   const [showForm, setShowForm] = useState(false)
-
-  useEffect(() => {
-    const fetchPrendas = async () => {
-      const { data } = await getPrendas()
-      setPrendas(data ?? [])
-    }
-
-    fetchPrendas()
-  }, [getPrendas])
 
   const columns = [
     {
@@ -43,9 +33,6 @@ export default function PrendasList() {
     if (!confirm('¿Estás seguro de eliminar esta prenda?')) return
 
     await deletePrenda(id)
-
-    const { data } = await getPrendas()
-    setPrendas(data ?? [])
   }
 
   return (
@@ -79,12 +66,9 @@ export default function PrendasList() {
       {showForm && (
         <PrendaForm
           prenda={editingPrenda}
-          onClose={async () => {
+          onClose={() => {
             setShowForm(false)
             setEditingPrenda(null)
-
-            const { data } = await getPrendas()
-            setPrendas(data ?? [])
           }}
         />
       )}
