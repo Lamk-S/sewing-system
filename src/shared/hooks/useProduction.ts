@@ -1,57 +1,71 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import type { Tables } from '../../types/supabase';
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
+import type { Tables } from '../../types/supabase'
 
 // Tipos con solo las columnas que usamos
-type Prenda = Pick<Tables<'prendas'>, 'id' | 'nombre' | 'codigo'>;
-
+type Prenda = Pick<Tables<'prendas'>, 'id' | 'nombre' | 'codigo'>
 type Operacion = Pick<
   Tables<'operaciones'>,
   'id' | 'prenda_id' | 'nombre' | 'precio_fijo' | 'tiempo_estimado_minutos'
->;
+>
+type Color = Pick<Tables<'colores'>, 'id' | 'nombre' | 'codigo_hex'>
 
-type Color = Pick<Tables<'colores'>, 'id' | 'nombre' | 'codigo_hex'>;
+async function fetchPrendas(): Promise<Prenda[]> {
+  const { data, error } = await supabase
+    .from('prendas')
+    .select('id, nombre, codigo')
+    .eq('activo', true)
+
+  if (error) throw error
+  return data
+}
+
+async function fetchOperaciones(): Promise<Operacion[]> {
+  const { data, error } = await supabase
+    .from('operaciones')
+    .select('id, prenda_id, nombre, precio_fijo, tiempo_estimado_minutos')
+    .eq('activo', true)
+
+  if (error) throw error
+  return data
+}
+
+async function fetchColores(): Promise<Color[]> {
+  const { data, error } = await supabase
+    .from('colores')
+    .select('id, nombre, codigo_hex')
+    .eq('activo', true)
+
+  if (error) throw error
+    return data
+}
 
 export function useProduction() {
-  const [prendas, setPrendas] = useState<Prenda[]>([]);
-  const [operaciones, setOperaciones] = useState<Operacion[]>([]);
-  const [colores, setColores] = useState<Color[]>([]);
-  const [loading, setLoading] = useState(false);
+  const prendasQuery = useQuery<Prenda[], Error>({
+    queryKey: ['prendas'],
+    queryFn: fetchPrendas,
+  })
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoading(true);
+  const operacionesQuery = useQuery<Operacion[], Error>({
+    queryKey: ['operaciones'],
+    queryFn: fetchOperaciones,
+  })
 
-      const [resPrendas, resOperaciones, resColores] = await Promise.all([
-        supabase
-          .from('prendas')
-          .select('id, nombre, codigo')
-          .eq('activo', true),
+  const coloresQuery = useQuery<Color[], Error>({
+    queryKey: ['colores'],
+    queryFn: fetchColores,
+  })
 
-        supabase
-          .from('operaciones')
-          .select('id, prenda_id, nombre, precio_fijo, tiempo_estimado_minutos')
-          .eq('activo', true),
-
-        supabase
-          .from('colores')
-          .select('id, nombre, codigo_hex')
-          .eq('activo', true),
-      ]);
-
-      if (resPrendas.error) console.error(resPrendas.error);
-      if (resOperaciones.error) console.error(resOperaciones.error);
-      if (resColores.error) console.error(resColores.error);
-
-      if (resPrendas.data) setPrendas(resPrendas.data);
-      if (resOperaciones.data) setOperaciones(resOperaciones.data);
-      if (resColores.data) setColores(resColores.data);
-
-      setLoading(false);
-    };
-
-    cargarDatos();
-  }, []);
-
-  return { prendas, operaciones, colores, loading };
+  return {
+    prendas: prendasQuery.data ?? [],
+    operaciones: operacionesQuery.data ?? [],
+    colores: coloresQuery.data ?? [],
+    loading: prendasQuery.isLoading || operacionesQuery.isLoading || coloresQuery.isLoading,
+    error: prendasQuery.error || operacionesQuery.error || coloresQuery.error,
+    refetch: () => {
+      prendasQuery.refetch()
+      operacionesQuery.refetch()
+      coloresQuery.refetch()
+    },
+  }
 }
