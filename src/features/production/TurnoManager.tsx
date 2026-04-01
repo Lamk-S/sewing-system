@@ -1,21 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../shared/lib/supabase'
-import { useAuth } from '../../shared/hooks/useAuth'
+import { useAuth } from '../../shared/auth/useAuth'
 import { toast } from 'sonner'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
 
 export default function TurnoManager() {
   const { session } = useAuth()
-
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // 🔥 Sincronizar estado con BD
   useEffect(() => {
-    const verificarTurno = async () => {
-      if (!session) return
+    if (!session) return setLoading(false)
 
+    const verificarTurno = async () => {
       const { data, error } = await supabase
         .from('turnos')
         .select('id')
@@ -35,83 +33,53 @@ export default function TurnoManager() {
     verificarTurno()
   }, [session])
 
-  if (!session) return null
+  if (!session) return <div>No autenticado</div>
+  if (loading) return <div className="flex justify-center items-center py-10"><Clock className="animate-spin text-gray-500" size={28} /></div>
 
   const iniciarTurno = async () => {
     setGuardando(true)
-
     const { error } = await supabase.from('turnos').insert({
       trabajador_id: session.user.id,
       fecha: new Date().toISOString().split('T')[0],
       hora_inicio: new Date().toISOString(),
       estado: 'abierto'
     })
-
     setGuardando(false)
 
-    if (error) {
-      console.error(error)
-      toast.error("Error al iniciar turno")
-      return
-    }
-
+    if (error) return toast.error("Error al iniciar turno")
     toast.success("Turno iniciado")
     setTurnoAbierto(true)
   }
 
   const finalizarTurno = async () => {
     setGuardando(true)
+    try {
+      const { data: turno, error } = await supabase
+        .from('turnos')
+        .select('id, hora_inicio')
+        .eq('trabajador_id', session.user.id)
+        .eq('estado', 'abierto')
+        .maybeSingle()
 
-    const { data: turno, error: errorFetch } = await supabase
-      .from('turnos')
-      .select('id, hora_inicio')
-      .eq('trabajador_id', session.user.id)
-      .eq('estado', 'abierto')
-      .maybeSingle()
+      if (error) throw error
+      if (!turno) throw new Error("No hay turno abierto para cerrar")
 
-    if (errorFetch) {
-      console.error(errorFetch)
-      toast.error("Error obteniendo turno")
+      const duracion = (Date.now() - new Date(turno.hora_inicio).getTime()) / 3600000
+
+      const { error: errorUpdate } = await supabase
+        .from('turnos')
+        .update({ hora_fin: new Date().toISOString(), total_horas: duracion, estado: 'cerrado' })
+        .eq('id', turno.id)
+
+      if (errorUpdate) throw errorUpdate
+      toast.success(`Turno cerrado: ${duracion.toFixed(2)} h`)
+      setTurnoAbierto(false)
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : "Error desconocido")
+    } finally {
       setGuardando(false)
-      return
     }
-
-    if (!turno) {
-      toast.error("No hay turno abierto para cerrar")
-      setGuardando(false)
-      return
-    }
-
-    const duracion =
-      (new Date().getTime() - new Date(turno.hora_inicio).getTime()) / 3600000
-
-    const { error } = await supabase
-      .from('turnos')
-      .update({
-        hora_fin: new Date().toISOString(),
-        total_horas: duracion,
-        estado: 'cerrado'
-      })
-      .eq('id', turno.id)
-
-    setGuardando(false)
-
-    if (error) {
-      console.error(error)
-      toast.error("Error al cerrar turno")
-      return
-    }
-
-    toast.success(`Turno cerrado: ${duracion.toFixed(2)} h`)
-    setTurnoAbierto(false)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-10">
-        <Clock className="animate-spin text-gray-500" size={28} />
-      </div>
-    )
   }
 
   return (
@@ -123,52 +91,23 @@ export default function TurnoManager() {
 
       <div className="bg-gray-50 p-4 rounded-lg mb-6">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Clock
-            size={24}
-            className={turnoAbierto ? "text-green-600" : "text-gray-400"}
-          />
-
-          <span
-            className={`text-lg font-bold ${
-              turnoAbierto ? "text-green-600" : "text-gray-600"
-            }`}
-          >
+          <Clock size={24} className={turnoAbierto ? "text-green-600" : "text-gray-400"} />
+          <span className={`text-lg font-bold ${turnoAbierto ? "text-green-600" : "text-gray-600"}`}>
             {turnoAbierto ? "Turno Activo" : "Sin Turno"}
           </span>
         </div>
-
-        {turnoAbierto && (
-          <p className="text-sm text-gray-500 text-center">
-            Inicia tu producción para calcular tu tarifa horaria
-          </p>
-        )}
+        {turnoAbierto && <p className="text-sm text-gray-500 text-center">Inicia tu producción para calcular tu tarifa horaria</p>}
       </div>
 
       <div className="space-y-3">
         {!turnoAbierto ? (
-          <button
-            onClick={iniciarTurno}
-            disabled={guardando}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg flex justify-center items-center"
-          >
-            {guardando ? (
-              <Clock className="animate-spin mr-2" size={20} />
-            ) : (
-              <CheckCircle className="mr-2" size={20} />
-            )}
+          <button onClick={iniciarTurno} disabled={guardando} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg flex justify-center items-center">
+            {guardando ? <Clock className="animate-spin mr-2" size={20} /> : <CheckCircle className="mr-2" size={20} />}
             {guardando ? 'Iniciando...' : 'Iniciar Turno'}
           </button>
         ) : (
-          <button
-            onClick={finalizarTurno}
-            disabled={guardando}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg flex justify-center items-center"
-          >
-            {guardando ? (
-              <Clock className="animate-spin mr-2" size={20} />
-            ) : (
-              <XCircle className="mr-2" size={20} />
-            )}
+          <button onClick={finalizarTurno} disabled={guardando} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg flex justify-center items-center">
+            {guardando ? <Clock className="animate-spin mr-2" size={20} /> : <XCircle className="mr-2" size={20} />}
             {guardando ? 'Cerrando...' : 'Finalizar Turno'}
           </button>
         )}

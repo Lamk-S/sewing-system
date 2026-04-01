@@ -1,26 +1,26 @@
-import { BrowserRouter as Router } from 'react-router-dom'
-import { Toaster } from 'sonner'
+import { BrowserRouter } from 'react-router-dom'
+import { AuthProvider } from '../shared/auth/AuthProvider'
+import RoutesApp from './RoutesApp'
 
-import { useAuth } from '../shared/hooks/useAuth'
-import AppRoutes from './routes'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-function App() {
-  const { session, loading } = useAuth()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin h-10 w-10 border-b-2 border-gray-900 rounded-full" />
-      </div>
-    )
-  }
-
+export default function App() {
   return (
-    <Router>
-      <Toaster position="top-center" richColors />
-      <AppRoutes session={session} />
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <RoutesApp />
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }
-
-export default App

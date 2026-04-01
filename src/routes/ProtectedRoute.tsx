@@ -1,14 +1,16 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../shared/auth/useAuth'
 
-export default function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { session, isAdmin, loading } = useAuth()
+interface Props {
+  children: React.ReactNode
+}
+
+export default function ProtectedRoute({ children }: Props) {
+  const { session, loading } = useAuth()
 
   if (loading) return <div>Cargando...</div>
 
   if (!session) return <Navigate to="/login" replace />
-
-  if (!isAdmin) return <Navigate to="/produccion" replace />
 
   return <>{children}</>
 }

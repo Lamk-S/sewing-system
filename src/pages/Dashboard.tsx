@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../shared/lib/supabase'
-import { useAuth } from '../../shared/hooks/useAuth'
+import { supabase } from '../shared/lib/supabase'
+import { useAuth } from '../shared/auth/useAuth'
 import { BarChart, DollarSign, Clock } from 'lucide-react'
-import type { Tables } from '../../types/supabase'
+import type { Tables } from '../types/supabase'
 
 type ResumenDiario = Tables<'v_resumen_diario'>
 type ResumenSemanal = Tables<'v_resumen_semanal'>
