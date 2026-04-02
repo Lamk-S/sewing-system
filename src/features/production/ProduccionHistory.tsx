@@ -18,7 +18,6 @@ export default function ProduccionHistory() {
 
   useEffect(() => {
     if (!session) {
-      // Evitamos setState inmediato usando setTimeout
       const timer = setTimeout(() => setLoading(false), 0)
       return () => clearTimeout(timer)
     }
