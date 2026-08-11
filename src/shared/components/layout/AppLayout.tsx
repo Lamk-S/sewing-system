@@ -3,10 +3,14 @@ import { Link, useLocation } from 'react-router-dom'
 import { Button } from '../ui/button'
 import { LogOut, Home, Clock, History, BarChart3, Users } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useSyncCatalogs } from '../../hooks/useSyncCatalogs'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut, isAdmin } = useAuth()
   const location = useLocation()
+
+  // Ejecuta la sincronización en background
+  const { isSyncing } = useSyncCatalogs()
 
   const navItems = [
     { path: '/produccion', label: 'Producción', icon: Home },
@@ -45,10 +49,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <Button onClick={signOut} variant="ghost">
-            <LogOut className="w-4 h-4 mr-2" />
-            Salir
-          </Button>
+          <div className="flex items-center gap-4">
+            {/* Indicador visual de sincronización */}
+            {isSyncing && (
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full animate-pulse flex items-center gap-1">
+                <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                Sincronizando...
+              </span>
+            )}
+            
+            <Button onClick={signOut} variant="ghost">
+              <LogOut className="w-4 h-4 mr-2" />
+              Salir
+            </Button>
+          </div>
+          
         </div>
       </header>
 
