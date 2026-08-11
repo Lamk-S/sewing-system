@@ -7,7 +7,6 @@ import type {
   TablesUpdate,
 } from "../../types/supabase"
 
-// ✅ SOLO tablas reales
 type TableName = keyof Database["public"]["Tables"]
 
 export function useCrud<T extends TableName>(table: T) {
@@ -15,7 +14,7 @@ export function useCrud<T extends TableName>(table: T) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 📥 GET ALL
+  // GET ALL
   const getAll = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -33,7 +32,7 @@ export function useCrud<T extends TableName>(table: T) {
     setLoading(false)
   }, [table])
 
-  // ➕ CREATE
+  // CREATE
   const create = async (values: TablesInsert<T>) => {
     setLoading(true)
     setError(null)
@@ -47,7 +46,7 @@ export function useCrud<T extends TableName>(table: T) {
     setLoading(false)
   }
 
-  // ✏️ UPDATE
+  // UPDATE
   const update = async (
     id: Tables<T>["id"],
     values: TablesUpdate<T>
@@ -64,7 +63,7 @@ export function useCrud<T extends TableName>(table: T) {
     setLoading(false)
   }
 
-  // ❌ DELETE
+  // DELETE
   const remove = async (id: Tables<T>["id"]) => {
     setLoading(true)
     setError(null)

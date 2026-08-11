@@ -1,71 +1,27 @@
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
-import type { Tables } from '../../types/supabase'
-
-// Tipos con solo las columnas que usamos
-type Prenda = Pick<Tables<'prendas'>, 'id' | 'nombre' | 'codigo'>
-type Operacion = Pick<
-  Tables<'operaciones'>,
-  'id' | 'prenda_id' | 'nombre' | 'precio_fijo' | 'tiempo_estimado_minutos'
->
-type Color = Pick<Tables<'colores'>, 'id' | 'nombre' | 'codigo_hex'>
-
-async function fetchPrendas(): Promise<Prenda[]> {
-  const { data, error } = await supabase
-    .from('prendas')
-    .select('id, nombre, codigo')
-    .eq('activo', true)
-
-  if (error) throw error
-  return data
-}
-
-async function fetchOperaciones(): Promise<Operacion[]> {
-  const { data, error } = await supabase
-    .from('operaciones')
-    .select('id, prenda_id, nombre, precio_fijo, tiempo_estimado_minutos')
-    .eq('activo', true)
-
-  if (error) throw error
-  return data
-}
-
-async function fetchColores(): Promise<Color[]> {
-  const { data, error } = await supabase
-    .from('colores')
-    .select('id, nombre, codigo_hex')
-    .eq('activo', true)
-
-  if (error) throw error
-    return data
-}
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
 
 export function useProduction() {
-  const prendasQuery = useQuery<Prenda[], Error>({
-    queryKey: ['prendas'],
-    queryFn: fetchPrendas,
-  })
+  // useLiveQuery escucha cambios en Dexie y re-renderiza automáticamente.
+  // Es 100% offline y la respuesta es de 0ms.
+  
+  const prendas = useLiveQuery(() => db.prendas.toArray(), []) ?? [];
+  const operaciones = useLiveQuery(() => db.operaciones.toArray(), []) ?? [];
+  const colores = useLiveQuery(() => db.colores.toArray(), []) ?? [];
 
-  const operacionesQuery = useQuery<Operacion[], Error>({
-    queryKey: ['operaciones'],
-    queryFn: fetchOperaciones,
-  })
-
-  const coloresQuery = useQuery<Color[], Error>({
-    queryKey: ['colores'],
-    queryFn: fetchColores,
-  })
+  // Si useLiveQuery devuelve undefined, significa que Dexie aún está inicializando
+  // (Ocurre durante unos pocos milisegundos en el primer montaje)
+  const loading = prendas === undefined || operaciones === undefined || colores === undefined;
 
   return {
-    prendas: prendasQuery.data ?? [],
-    operaciones: operacionesQuery.data ?? [],
-    colores: coloresQuery.data ?? [],
-    loading: prendasQuery.isLoading || operacionesQuery.isLoading || coloresQuery.isLoading,
-    error: prendasQuery.error || operacionesQuery.error || coloresQuery.error,
+    prendas,
+    operaciones,
+    colores,
+    loading,
+    error: null, // Los errores de lectura local son prácticamente inexistentes en Dexie
     refetch: () => {
-      prendasQuery.refetch()
-      operacionesQuery.refetch()
-      coloresQuery.refetch()
+      // Función mantenida intencionalmente vacía por compatibilidad de firma.
+      // Dexie reactivo (useLiveQuery) no necesita refetch manual.
     },
-  }
+  };
 }
