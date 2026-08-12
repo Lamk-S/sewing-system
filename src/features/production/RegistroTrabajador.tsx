@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
-import { supabase } from '../../shared/lib/supabase'
 import { useProduction } from '../../shared/hooks/useProduction'
 import { useAuth } from '../../shared/auth/useAuth'
 import { toast } from 'sonner'
 import { Plus, Minus, Save, Loader2, LogOut } from 'lucide-react'
+import { db, type RegistroLocal } from '../../shared/lib/db'
 
 export default function RegistroTrabajador() {
-  const { session } = useAuth()
+  const { session, signOut } = useAuth()
   const { prendas, operaciones, colores, loading } = useProduction()
 
   const [prendaSeleccionada, setPrendaSeleccionada] = useState<string>('')
@@ -15,15 +15,10 @@ export default function RegistroTrabajador() {
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const inicial = colores.reduce((acc, c) => {
-        acc[c.id] = 0
-        return acc
-      }, {} as Record<number, number>)
+    if (colores.length > 0) {
+      const inicial = colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {})
       setCantidades(inicial)
-    }, 0)
-
-    return () => clearTimeout(timer)
+    }
   }, [colores])
 
   const valorTotal = useMemo(() => {
@@ -51,42 +46,48 @@ export default function RegistroTrabajador() {
   const guardarRegistro = async () => {
     if (!prendaSeleccionada || !operacionSeleccionada) return toast.error("Selecciona prenda y operación")
 
-    const registros = Object.entries(cantidades)
+    const registrosLocales: RegistroLocal[] = Object.entries(cantidades)
       .filter(([, cant]) => cant > 0)
       .map(([colorId, cantidad]) => ({
         operacion_id: Number(operacionSeleccionada),
         color_id: Number(colorId),
         cantidad,
-        trabajador_id: session.user.id
+        trabajador_id: session.user.id,
+        fecha_trabajo: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString(),
+        sync_status: 'pending'
       }))
 
-    if (registros.length === 0) return toast.error("Ingresa al menos una cantidad mayor a cero")
+    if (registrosLocales.length === 0) return toast.error("Ingresa al menos una cantidad mayor a cero")
 
     setGuardando(true)
-    const { error } = await supabase.from('registros_produccion').insert(registros)
-    setGuardando(false)
-
-    if (error) return toast.error("Error al guardar producción")
-    toast.success(`Se guardaron ${registros.length} registros`)
-
-    setCantidades(colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {}))
-    setOperacionSeleccionada('')
+    try {
+      // Guardado 100% Offline en IndexedDB
+      await db.registros.bulkAdd(registrosLocales)
+      
+      toast.success(`Se guardaron ${registrosLocales.length} registros (Offline)`)
+      setCantidades(colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {}))
+      setOperacionSeleccionada('')
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al guardar producción localmente")
+    } finally {
+      setGuardando(false)
+    }
   }
 
   return (
     <div className="max-w-md mx-auto p-4 bg-white rounded-xl shadow-lg mt-6 border border-gray-100">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6 border-b pb-4">
         <div>
           <h2 className="text-xl font-bold text-gray-800">TIEMP - Producción</h2>
           <p className="text-xs text-gray-500">Registro de Operaciones</p>
         </div>
-        <button onClick={() => supabase.auth.signOut()} className="text-gray-400 hover:text-red-500 transition-colors">
+        <button onClick={signOut} className="text-gray-400 hover:text-red-500 transition-colors">
           <LogOut size={20} />
         </button>
       </div>
 
-      {/* Selección Prenda */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">1. Prenda</label>
         <select
@@ -99,7 +100,6 @@ export default function RegistroTrabajador() {
         </select>
       </div>
 
-      {/* Selección Operación */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-1">2. Operación</label>
         <select
@@ -115,7 +115,6 @@ export default function RegistroTrabajador() {
         </select>
       </div>
 
-      {/* Colores */}
       <div className="space-y-3 mb-8">
         <h3 className="text-sm font-semibold text-gray-600 uppercase">Cantidades por Color</h3>
         {colores.map(color => (
@@ -133,17 +132,15 @@ export default function RegistroTrabajador() {
         ))}
       </div>
 
-      {/* Total */}
       <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-100 flex justify-between items-center">
         <span className="text-sm text-blue-800">Valor Estimado del Lote</span>
         <span className="text-xl font-bold text-blue-900">${valorTotal.toFixed(2)}</span>
       </div>
 
-      {/* Guardar */}
       <button
         onClick={guardarRegistro}
         disabled={guardando || !operacionSeleccionada}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex justify-center items-center"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex justify-center items-center disabled:opacity-50"
       >
         {guardando ? <Loader2 className="animate-spin mr-2" size={20} /> : <Save className="mr-2" size={20} />}
         {guardando ? 'Guardando...' : 'Guardar Producción'}
