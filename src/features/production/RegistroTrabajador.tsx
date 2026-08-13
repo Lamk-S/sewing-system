@@ -49,6 +49,7 @@ export default function RegistroTrabajador() {
     const registrosLocales: RegistroLocal[] = Object.entries(cantidades)
       .filter(([, cant]) => cant > 0)
       .map(([colorId, cantidad]) => ({
+        local_id: crypto.randomUUID(),
         operacion_id: Number(operacionSeleccionada),
         color_id: Number(colorId),
         cantidad,
@@ -62,8 +63,7 @@ export default function RegistroTrabajador() {
 
     setGuardando(true)
     try {
-      // Guardado 100% Offline en IndexedDB
-      await db.registros.bulkAdd(registrosLocales)
+      await db.registros_produccion.bulkAdd(registrosLocales)
       
       toast.success(`Se guardaron ${registrosLocales.length} registros (Offline)`)
       setCantidades(colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {}))

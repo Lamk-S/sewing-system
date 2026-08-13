@@ -9,7 +9,7 @@ export default function ProduccionHistory() {
   const historialCompleto = useLiveQuery(async () => {
     if (!session) return null;
 
-    const registrosLocales = await db.registros
+    const registrosLocales = await db.registros_produccion
       .where('trabajador_id').equals(session.user.id)
       .reverse()
       .sortBy('created_at');
