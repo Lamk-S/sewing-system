@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../shared/lib/supabase'
 import { useAuth } from '../shared/auth/useAuth'
 import { BarChart, DollarSign, Clock } from 'lucide-react'
-import type { Tables } from '../types/supabase'
 
-type ResumenDiario = Tables<'v_resumen_diario'>
-type ResumenSemanal = Tables<'v_resumen_semanal'>
-type TarifaHoraria = Tables<'v_tarifa_horaria'>
+type ResumenDiario = { fecha_trabajo: string; total_piezas: number; total_ganado: number }
+type ResumenSemanal = { semana: string; total_piezas: number; total_ganado: number }
+type TarifaHoraria = { fecha: string; total_horas: number; tarifa_horaria_real: number }
 
 export default function Dashboard() {
   const { session } = useAuth()
@@ -21,8 +20,11 @@ export default function Dashboard() {
       setLoading(true)
 
       const [resDiario, resSemanal, resTarifa] = await Promise.all([
+        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_resumen_diario').select('*'),
+        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_resumen_semanal').select('*'),
+        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_tarifa_horaria').select('*')
       ])
 
@@ -30,9 +32,9 @@ export default function Dashboard() {
       if (resSemanal.error) console.error(resSemanal.error)
       if (resTarifa.error) console.error(resTarifa.error)
 
-      if (resDiario.data) setResumenDiario(resDiario.data)
-      if (resSemanal.data) setResumenSemanal(resSemanal.data)
-      if (resTarifa.data) setTarifaHoraria(resTarifa.data)
+      if (resDiario.data) setResumenDiario(resDiario.data as unknown as ResumenDiario[])
+      if (resSemanal.data) setResumenSemanal(resSemanal.data as unknown as ResumenSemanal[])
+      if (resTarifa.data) setTarifaHoraria(resTarifa.data as unknown as TarifaHoraria[])
 
       setLoading(false)
     }
