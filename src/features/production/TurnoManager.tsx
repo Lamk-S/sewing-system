@@ -22,18 +22,16 @@ export default function TurnoManager() {
 
   if (!session) return <div>No autenticado</div>
   
-  // Si turnoActivo es undefined, Dexie está cargando
   if (turnoActivo === undefined) return <div className="flex justify-center items-center py-10"><Clock className="animate-spin text-gray-500" size={28} /></div>
 
   const iniciarTurno = async () => {
     setGuardando(true)
     try {
       await db.turnos.add({
+        local_id: crypto.randomUUID(),
         trabajador_id: session.user.id,
         fecha: new Date().toISOString().split('T')[0],
         hora_inicio: new Date().toISOString(),
-        hora_fin: null,
-        total_horas: null,
         estado: 'abierto',
         sync_status: 'pending' 
       })
@@ -57,7 +55,7 @@ export default function TurnoManager() {
         hora_fin: new Date().toISOString(),
         total_horas: duracion,
         estado: 'cerrado',
-        sync_status: 'pending'
+        sync_status: 'pending' 
       })
       
       toast.success(`Turno cerrado: ${duracion.toFixed(2)} h (Offline)`)

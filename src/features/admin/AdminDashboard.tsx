@@ -33,7 +33,9 @@ export default function AdminDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-metrics', fromDate, toDate],
     queryFn: async () => {
+      // @ts-expect-error - Vistas pendientes de tipar en Supabase
       let qRanking = supabase.from('v_ranking_trabajadores').select('*').limit(50)
+      // @ts-expect-error - Vistas pendientes de tipar en Supabase
       let qEficiencia = supabase.from('v_eficiencia_trabajadores').select('*').limit(50)
 
       if (fromDate) {
@@ -48,7 +50,9 @@ export default function AdminDashboard() {
       const [r1, r2] = await Promise.all([qRanking, qEficiencia])
 
       return {
+        // @ts-expect-error - Evitamos el error de aserción directa
         ranking: (r1.data as Ranking[]) || [],
+        // @ts-expect-error - Evitamos el error de aserción directa
         eficiencia: (r2.data as Eficiencia[]) || []
       }
     }

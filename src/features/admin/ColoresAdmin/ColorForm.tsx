@@ -23,7 +23,7 @@ export function ColorForm({ color, onClose }: Props) {
 
     try {
       if (color?.id) {
-        await updateColor(color.id, formData)
+        await updateColor({ id: color.id, updates: formData })
       } else {
         await createColor(formData)
       }

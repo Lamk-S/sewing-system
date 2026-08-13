@@ -1,94 +1,120 @@
-import { useState, useEffect, useCallback } from "react"
-import { supabase } from "../lib/supabase"
-import type {
-  Database,
-  Tables,
-  TablesInsert,
-  TablesUpdate,
-} from "../../types/supabase"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
+import type { Database } from '../../types/supabase';
 
-type TableName = keyof Database["public"]["Tables"]
+type CatalogTable = 'prendas' | 'operaciones' | 'colores';
 
-export function useCrud<T extends TableName>(table: T) {
-  const [data, setData] = useState<Tables<T>[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export function useCrud<T extends CatalogTable>(tableName: T) {
+  const queryClient = useQueryClient();
+  const queryKey = [tableName];
 
-  // GET ALL
-  const getAll = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  type Row = Database['public']['Tables'][T]['Row'];
+  type Insert = Database['public']['Tables'][T]['Insert'];
+  type Update = Database['public']['Tables'][T]['Update'];
 
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
+  const { data, isLoading, error, refetch } = useQuery<Row[]>({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order('id', { ascending: true });
+        
+      if (error) throw new Error(error.message);
+      return data as unknown as Row[];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
-    if (error) {
-      setError(error.message)
-    } else {
-      setData(data as Tables<T>[])
-    }
+  const createRecord = useMutation({
+    mutationFn: async (newItem: Insert) => {
+      const { data, error } = await supabase
+        .from(tableName)
+        .insert(newItem as never)
+        .select()
+        .single();
+        
+      if (error) throw new Error(error.message);
+      return data as unknown as Row;
+    },
+    onMutate: async (newItem) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData<Row[]>(queryKey);
+      const optimisticItem = { ...newItem, id: -Math.random() } as unknown as Row;
+      queryClient.setQueryData<Row[]>(queryKey, (old) => [...(old || []), optimisticItem]);
+      return { previousData };
+    },
+    onError: (err, _, context) => {
+      queryClient.setQueryData(queryKey, context?.previousData);
+      toast.error(`Error al crear: ${err.message}`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
 
-    setLoading(false)
-  }, [table])
+  const updateRecord = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: Update }) => {
+      const { data, error } = await supabase
+        .from(tableName)
+        .update(updates as never)
+        .eq('id' as never, id)
+        .select()
+        .single();
+        
+      if (error) throw new Error(error.message);
+      return data as unknown as Row;
+    },
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData<Row[]>(queryKey);
+      queryClient.setQueryData<Row[]>(queryKey, (old) => 
+        old?.map(item => item.id === id ? { ...item, ...updates } : item) as Row[]
+      );
+      return { previousData };
+    },
+    onError: (err, _, context) => {
+      queryClient.setQueryData(queryKey, context?.previousData);
+      toast.error(`Error al actualizar: ${err.message}`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
 
-  // CREATE
-  const create = async (values: TablesInsert<T>) => {
-    setLoading(true)
-    setError(null)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from(table as any).insert(values) 
-
-    if (error) setError(error.message)
-
-    await getAll()
-    setLoading(false)
-  }
-
-  // UPDATE
-  const update = async (
-    id: Tables<T>["id"],
-    values: TablesUpdate<T>
-  ) => {
-    setLoading(true)
-    setError(null)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from(table as any).update(values).eq("id", id)
-
-    if (error) setError(error.message)
-
-    await getAll()
-    setLoading(false)
-  }
-
-  // DELETE
-  const remove = async (id: Tables<T>["id"]) => {
-    setLoading(true)
-    setError(null)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from(table as any).delete().eq("id", id)
-
-    if (error) setError(error.message)
-
-    await getAll()
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    getAll()
-  }, [getAll])
+  const deleteRecord = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id' as never, id);
+        
+      if (error) throw new Error(error.message);
+      return id;
+    },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData<Row[]>(queryKey);
+      queryClient.setQueryData<Row[]>(queryKey, (old) => old?.filter(item => item.id !== id));
+      return { previousData };
+    },
+    onError: (err, _, context) => {
+      queryClient.setQueryData(queryKey, context?.previousData);
+      toast.error(`Error al eliminar: ${err.message}`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
 
   return {
-    data,
-    loading,
+    data: data || [],
+    isLoading,
     error,
-    getAll,
-    create,
-    update,
-    remove,
-  }
+    refetch,
+    create: createRecord.mutateAsync,
+    update: updateRecord.mutateAsync,
+    remove: deleteRecord.mutateAsync,
+  };
 }
