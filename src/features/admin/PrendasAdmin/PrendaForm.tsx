@@ -23,7 +23,7 @@ export function PrendaForm({ prenda, onClose }: Props) {
 
     try {
       if (prenda?.id) {
-        await updatePrenda(prenda.id, formData)
+        await updatePrenda({ id: prenda.id, updates: formData })
       } else {
         await createPrenda(formData)
       }

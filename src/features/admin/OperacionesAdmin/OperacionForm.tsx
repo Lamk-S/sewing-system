@@ -32,7 +32,7 @@ export function OperacionForm({ operacion, prendas, onClose }: Props) {
 
     try {
       if (operacion?.id) {
-        await updateOperacion(operacion.id, formData)
+        await updateOperacion({ id: operacion.id, updates: formData })
       } else {
         await createOperacion(formData)
       }

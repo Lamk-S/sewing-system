@@ -6,28 +6,25 @@ export function useAdmin() {
   const prendasCrud = useCrud('prendas')
 
   return {
-    // === COLORES ===
     colores: coloresCrud.data,
     createColor: coloresCrud.create,
     updateColor: coloresCrud.update,
     deleteColor: coloresCrud.remove,
-    refetchColores: coloresCrud.getAll,
+    refetchColores: coloresCrud.refetch,
 
-    // === OPERACIONES ===
     operaciones: operacionesCrud.data,
     createOperacion: operacionesCrud.create,
     updateOperacion: operacionesCrud.update,
     deleteOperacion: operacionesCrud.remove,
-    refetchOperaciones: operacionesCrud.getAll,
+    refetchOperaciones: operacionesCrud.refetch,
 
-    // === PRENDAS ===
     prendas: prendasCrud.data,
     createPrenda: prendasCrud.create,
     updatePrenda: prendasCrud.update,
     deletePrenda: prendasCrud.remove,
-    refetchPrendas: prendasCrud.getAll,
+    refetchPrendas: prendasCrud.refetch,
 
-    // Estado de carga global (útil para deshabilitar botones en cualquier formulario)
-    loading: coloresCrud.loading || operacionesCrud.loading || prendasCrud.loading
+    loading: coloresCrud.isLoading || operacionesCrud.isLoading || prendasCrud.isLoading,
+    error: coloresCrud.error || operacionesCrud.error || prendasCrud.error
   }
 }
