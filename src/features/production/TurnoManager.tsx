@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useAuth } from '../../shared/auth/useAuth'
+import { useAuth } from '../../shared/auth/AuthProvider'
 import { db } from '../../shared/lib/db'
 import { toast } from 'sonner'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
@@ -10,12 +10,15 @@ export default function TurnoManager() {
   const [guardando, setGuardando] = useState(false)
 
   const turnoActivo = useLiveQuery(
-    () => {
+    async () => {
       if (!session) return undefined;
-      return db.turnos
+
+      const turno = await db.turnos
         .where('trabajador_id').equals(session.user.id)
         .filter(t => t.estado === 'abierto')
         .first();
+      
+      return turno !== undefined ? turno : null;
     },
     [session]
   )
