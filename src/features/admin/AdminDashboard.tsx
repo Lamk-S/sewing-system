@@ -5,6 +5,7 @@ import { supabase } from '../../shared/lib/supabase'
 import PrendasList from './PrendasAdmin/PrendasList'
 import ColoresList from './ColoresAdmin/ColoresList'
 import OperacionesList from './OperacionesAdmin/OperacionesList'
+import HistorialGlobal from './HistorialGlobal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/components/ui/tabs'
 
 type Ranking = {
@@ -33,9 +34,7 @@ export default function AdminDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-metrics', fromDate, toDate],
     queryFn: async () => {
-      // @ts-expect-error - Vistas pendientes de tipar en Supabase
       let qRanking = supabase.from('v_ranking_trabajadores').select('*').limit(50)
-      // @ts-expect-error - Vistas pendientes de tipar en Supabase
       let qEficiencia = supabase.from('v_eficiencia_trabajadores').select('*').limit(50)
 
       if (fromDate) {
@@ -187,14 +186,16 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* TABS DE MANTENIMIENTO */}
-      <Tabs defaultValue="prendas" className="w-full mt-2 bg-white p-6 rounded-xl shadow">
-        <h2 className="font-bold mb-4 text-xl">Gestión de Catálogos</h2>
-        <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
+      {/* TABS DE MANTENIMIENTO Y SUPERVISIÓN */}
+      <Tabs defaultValue="historial" className="w-full mt-2 bg-white p-6 rounded-xl shadow">
+        <h2 className="font-bold mb-4 text-xl">Gestión y Supervisión</h2>
+        <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg overflow-x-auto">
+          <TabsTrigger value="historial" className="rounded-md">Historial Global</TabsTrigger>
           <TabsTrigger value="prendas" className="rounded-md">Prendas</TabsTrigger>
           <TabsTrigger value="operaciones" className="rounded-md">Operaciones</TabsTrigger>
           <TabsTrigger value="colores" className="rounded-md">Colores</TabsTrigger>
         </TabsList>
+        <TabsContent value="historial" className="mt-6"><HistorialGlobal /></TabsContent>
         <TabsContent value="prendas" className="mt-6"><PrendasList /></TabsContent>
         <TabsContent value="operaciones" className="mt-6"><OperacionesList /></TabsContent>
         <TabsContent value="colores" className="mt-6"><ColoresList /></TabsContent>
