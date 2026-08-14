@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../shared/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useAuth } from '../shared/auth/useAuth'
+import { useAuth } from '../shared/auth/AuthProvider'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,14 +11,14 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
 
   const navigate = useNavigate()
-  const { session, isAdmin, loading: authLoading } = useAuth()
+  const { session, isAdmin } = useAuth()
 
   useEffect(() => {
-    if (!authLoading && session) {
+    if (session) {
       if (isAdmin) navigate('/admin')
       else navigate('/produccion')
     }
-  }, [session, isAdmin, authLoading, navigate])
+  }, [session, isAdmin, navigate])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,10 +37,6 @@ export default function Login() {
     }
 
     setLoading(false)
-  }
-
-  if (authLoading) {
-    return <div className="text-center mt-10">Cargando...</div>
   }
 
   return (
@@ -72,7 +68,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700"
+            className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
           >
             {loading
               ? 'Cargando...'

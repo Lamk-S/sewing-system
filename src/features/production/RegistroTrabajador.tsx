@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useProduction } from '../../shared/hooks/useProduction'
-import { useAuth } from '../../shared/auth/useAuth'
+import { useAuth } from '../../shared/auth/AuthProvider'
 import { toast } from 'sonner'
 import { Plus, Minus, Save, Loader2, LogOut } from 'lucide-react'
 import { db, type RegistroLocal } from '../../shared/lib/db'

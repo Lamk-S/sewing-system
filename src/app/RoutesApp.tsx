@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from '../shared/auth/useAuth'
+import { useAuth } from '../shared/auth/AuthProvider' 
 
 import Login from '../pages/Login'
 import RegistroTrabajador from '../features/production/RegistroTrabajador'
@@ -13,9 +13,7 @@ import AdminRoute from '../routes/AdminRoute'
 import AppLayout from '../shared/components/layout/AppLayout'
 
 export default function RoutesApp() {
-  const { session, loading, isAdmin } = useAuth()
-
-  if (loading) return <div>Cargando app...</div>
+  const { session, isAdmin } = useAuth()
 
   return (
     <Routes>

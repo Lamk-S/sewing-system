@@ -1,4 +1,4 @@
-import { useAuth } from '../../auth/useAuth'
+import { useAuth } from '../../auth/AuthProvider'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '../ui/button'
 import { LogOut, Home, Clock, History, BarChart3, Users } from 'lucide-react'

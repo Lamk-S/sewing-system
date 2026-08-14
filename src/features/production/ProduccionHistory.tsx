@@ -1,4 +1,4 @@
-import { useAuth } from '../../shared/auth/useAuth'
+import { useAuth } from '../../shared/auth/AuthProvider'
 import { Calendar } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../shared/lib/db'

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../shared/lib/supabase'
-import { useAuth } from '../shared/auth/useAuth'
+import { useAuth } from '../shared/auth/AuthProvider'
 import { BarChart, DollarSign, Clock } from 'lucide-react'
 
 type ResumenDiario = { fecha_trabajo: string; total_piezas: number; total_ganado: number }
@@ -20,11 +20,8 @@ export default function Dashboard() {
       setLoading(true)
 
       const [resDiario, resSemanal, resTarifa] = await Promise.all([
-        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_resumen_diario').select('*'),
-        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_resumen_semanal').select('*'),
-        // @ts-expect-error - Vistas pendientes de tipar
         supabase.from('v_tarifa_horaria').select('*')
       ])
 
