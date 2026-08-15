@@ -1,5 +1,5 @@
 import { useAuth } from '../../shared/auth/AuthProvider'
-import { Calendar } from 'lucide-react'
+import { Calendar, CheckCircle2, Clock } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../shared/lib/db'
 
@@ -18,19 +18,17 @@ export default function ProduccionHistory() {
       const operacion = await db.operaciones.get(reg.operacion_id!);
       const color = await db.colores.get(reg.color_id!);
       
-      return {
-        ...reg,
-        operacion,
-        color
-      };
+      return { ...reg, operacion, color };
     }));
   }, [session])
 
   if (!session) return null;
+  
   if (historialCompleto === undefined) {
     return (
-      <div className="flex justify-center items-center py-10">
-        <div className="animate-spin h-6 w-6 border-b-2 border-gray-900 rounded-full" />
+      <div className="flex justify-center items-center py-20 text-slate-500">
+        <Clock className="animate-spin mr-2" size={24} />
+        <span>Cargando tu historial...</span>
       </div>
     )
   }
@@ -44,56 +42,73 @@ export default function ProduccionHistory() {
   }, 0);
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">Historial de Producción (Local)</h2>
-        <div className="bg-green-100 px-4 py-2 rounded-lg">
-          <span className="text-green-800 font-bold">${totalGanado.toFixed(2)}</span>
+    <div className="max-w-3xl mx-auto p-4 md:p-6 mt-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Mi Historial</h2>
+          <p className="text-slate-500 text-sm">Registros guardados en este dispositivo</p>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-100 px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-3">
+          <span className="text-emerald-800 text-sm font-medium">Total Generado</span>
+          <span className="text-emerald-600 font-bold text-xl">${totalGanado.toFixed(2)}</span>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {historial.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
-            <p>No hay registros de producción recientes</p>
+          <div className="p-12 text-center text-slate-500">
+            <Calendar size={48} className="mx-auto mb-4 text-slate-300" strokeWidth={1.5} />
+            <p className="text-lg font-medium text-slate-700 mb-1">Sin registros recientes</p>
+            <p className="text-sm">Tu producción aparecerá aquí una vez que la registres.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-slate-100">
             {historial.map((item) => {
               const precio = item.operacion?.precio_fijo ?? 0;
               const cantidad = item.cantidad ?? 0;
               const totalItem = cantidad * precio;
+              const isPending = item.sync_status === 'pending';
 
               return (
-                <div key={item.id} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-bold text-gray-800">
-                        {item.operacion?.nombre ?? 'Operación desconocida'}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                         {item.color?.codigo_hex && (
-                            <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: item.color.codigo_hex }} />
-                         )}
-                        <p className="text-sm text-gray-500">
-                          {item.color?.nombre ?? 'Sin color'} • {cantidad} piezas
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end">
-                      <p className="font-bold text-green-600">${totalItem.toFixed(2)}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {/* Pequeño indicador si está pendiente de sincronizar */}
-                        {item.sync_status === 'pending' && (
-                           <span title="Pendiente de enviar al servidor" className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
+                <div key={item.id} className="p-4 sm:p-5 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-lg">
+                      {item.operacion?.nombre ?? 'Operación eliminada'}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                      <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded text-xs font-medium text-slate-600">
+                        {item.color?.codigo_hex && (
+                          <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shadow-sm" style={{ backgroundColor: item.color.codigo_hex }} />
                         )}
-                        <p className="text-xs text-gray-400">
-                          {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}
-                        </p>
+                        <span>{item.color?.nombre ?? 'Sin color'}</span>
                       </div>
+                      <span className="text-sm font-medium text-slate-700 border-l border-slate-300 pl-3">
+                        {cantidad} piezas
+                      </span>
                     </div>
                   </div>
+
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-0 pt-3 sm:pt-0 border-slate-100">
+                    <p className="font-bold text-emerald-600 text-lg">${totalItem.toFixed(2)}</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {isPending ? (
+                        <span title="Pendiente de enviar al servidor" className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                          Offline
+                        </span>
+                      ) : (
+                        <span title="Guardado en el servidor" className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 size={10} />
+                          Nube
+                        </span>
+                      )}
+                      <p className="text-xs text-slate-400 font-medium">
+                        {item.created_at ? new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                      </p>
+                    </div>
+                  </div>
+
                 </div>
               )
             })}
