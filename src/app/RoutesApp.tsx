@@ -8,8 +8,9 @@ import TurnoManager from '../features/production/TurnoManager'
 import Dashboard from '../pages/Dashboard'
 import AdminDashboard from '../features/admin/AdminDashboard'
 
-import ProtectedRoute from '../routes/ProtectedRoute'
-import AdminRoute from '../routes/AdminRoute'
+import RequireWorker from '../routes/RequireWorker'
+import RequireAdmin from '../routes/RequireAdmin'
+import RequireAuth from '../routes/RequireAuth'
 import AppLayout from '../shared/components/layout/AppLayout'
 
 export default function RoutesApp() {
@@ -19,74 +20,43 @@ export default function RoutesApp() {
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      {/* Trabajador */}
-      <Route
-        path="/produccion"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <RegistroTrabajador />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* ==========================================
+          RUTAS EXCLUSIVAS DE TRABAJADOR 
+      ========================================== */}
+      <Route path="/produccion" element={
+        <RequireWorker><AppLayout><RegistroTrabajador /></AppLayout></RequireWorker>
+      } />
 
-      <Route
-        path="/historial"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProduccionHistory />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/historial" element={
+        <RequireWorker><AppLayout><ProduccionHistory /></AppLayout></RequireWorker>
+      } />
 
-      <Route
-        path="/turnos"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TurnoManager />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/dashboard" element={
+        <RequireWorker><AppLayout><Dashboard /></AppLayout></RequireWorker>
+      } />
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Dashboard />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* ==========================================
+          RUTAS COMPARTIDAS (TRABAJADOR Y ADMIN)
+      ========================================== */}
+      <Route path="/turnos" element={
+        <RequireAuth><AppLayout><TurnoManager /></AppLayout></RequireAuth>
+      } />
 
-      {/* Admin */}
-      <Route
-        path="/admin"
-        element={
-          <AdminRoute>
-            <AppLayout>
-              <AdminDashboard />
-            </AppLayout>
-          </AdminRoute>
-        }
-      />
+      {/* ==========================================
+          RUTAS EXCLUSIVAS DE ADMINISTRADOR
+      ========================================== */}
+      <Route path="/admin" element={
+        <RequireAdmin><AppLayout><AdminDashboard /></AppLayout></RequireAdmin>
+      } />
 
-      {/* Redirect inteligente */}
-      <Route
-        path="/"
-        element={
-          session
-            ? isAdmin
-              ? <Navigate to="/admin" />
-              : <Navigate to="/produccion" />
-            : <Navigate to="/login" />
-        }
-      />
+      {/* Redirect */}
+      <Route path="/" element={
+        session 
+          ? isAdmin 
+            ? <Navigate to="/admin" replace /> 
+            : <Navigate to="/produccion" replace />
+          : <Navigate to="/login" replace />
+      } />
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
