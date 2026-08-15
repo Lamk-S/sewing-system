@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Sistema de Confección TIEMP',
-        short_name: 'TIEMP',
+        name: 'Sistema de Confección LamkSew',
+        short_name: 'LamkSew',
         description: 'Gestión de pagos a destajo y producción offline-first',
         theme_color: '#2563eb',
         background_color: '#f9fafb',

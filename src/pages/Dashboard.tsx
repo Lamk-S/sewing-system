@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../shared/lib/supabase'
 import { useAuth } from '../shared/auth/AuthProvider'
 import { BarChart, DollarSign, Clock } from 'lucide-react'
@@ -9,129 +9,120 @@ type TarifaHoraria = { fecha: string; total_horas: number; tarifa_horaria_real: 
 
 export default function Dashboard() {
   const { session } = useAuth()
-  const [resumenDiario, setResumenDiario] = useState<ResumenDiario[]>([])
-  const [resumenSemanal, setResumenSemanal] = useState<ResumenSemanal[]>([])
-  const [tarifaHoraria, setTarifaHoraria] = useState<TarifaHoraria[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const cargarReportes = async () => {
-      if (!session) return
-      setLoading(true)
-
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-trabajador', session?.user.id],
+    queryFn: async () => {
       const [resDiario, resSemanal, resTarifa] = await Promise.all([
-        supabase.from('v_resumen_diario').select('*'),
-        supabase.from('v_resumen_semanal').select('*'),
-        supabase.from('v_tarifa_horaria').select('*')
+        supabase.from('v_resumen_diario').select('*').limit(7), // Últimos 7 días
+        supabase.from('v_resumen_semanal').select('*').limit(4), // Últimas 4 semanas
+        supabase.from('v_tarifa_horaria').select('*').limit(7) // Últimos 7 turnos
       ])
 
-      if (resDiario.error) console.error(resDiario.error)
-      if (resSemanal.error) console.error(resSemanal.error)
-      if (resTarifa.error) console.error(resTarifa.error)
+      return {
+        diario: (resDiario.data as unknown as ResumenDiario[]) || [],
+        semanal: (resSemanal.data as unknown as ResumenSemanal[]) || [],
+        tarifa: (resTarifa.data as unknown as TarifaHoraria[]) || []
+      }
+    },
+    enabled: !!session
+  })
 
-      if (resDiario.data) setResumenDiario(resDiario.data as unknown as ResumenDiario[])
-      if (resSemanal.data) setResumenSemanal(resSemanal.data as unknown as ResumenSemanal[])
-      if (resTarifa.data) setTarifaHoraria(resTarifa.data as unknown as TarifaHoraria[])
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-20 text-slate-500">
+        <Clock className="animate-spin mr-2" size={24} />
+        <span>Cargando tu rendimiento...</span>
+      </div>
+    )
+  }
 
-      setLoading(false)
-    }
-
-    cargarReportes()
-  }, [session])
-
-  if (loading) return <div className="p-4 text-center">Cargando reportes...</div>
+  const { diario = [], semanal = [], tarifa = [] } = data || {}
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        Dashboard de Producción
-      </h2>
-
-      {/* Resumen Diario */}
-      <div className="bg-white p-6 rounded-xl shadow-md mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart className="text-blue-600" size={24} />
-          <h3 className="text-lg font-bold text-gray-700">
-            Resumen Diario
-          </h3>
-        </div>
-
-        {resumenDiario.length === 0 ? (
-          <p className="text-gray-500 text-center">No hay registros</p>
-        ) : (
-          <div className="space-y-2">
-            {resumenDiario.map((item) => (
-              <div
-                key={item.fecha_trabajo}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-              >
-                <span>{item.fecha_trabajo}</span>
-                <span>{item.total_piezas ?? 0} piezas</span>
-                <span className="font-bold text-green-600">
-                  ${(item.total_ganado ?? 0).toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+    <div className="max-w-6xl mx-auto p-4 md:p-6 mt-2">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-slate-800">Mi Rendimiento</h2>
+        <p className="text-sm text-slate-500">Métricas de producción y ganancias calculadas</p>
       </div>
 
-      {/* Tarifa Horaria */}
-      <div className="bg-white p-6 rounded-xl shadow-md mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="text-orange-600" size={24} />
-          <h3 className="text-lg font-bold text-gray-700">
-            Tarifa Horaria Real
-          </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {/* Resumen Diario */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+            <BarChart className="text-primary" size={20} />
+            <h3 className="font-semibold text-slate-800">Resumen Diario</h3>
+          </div>
+          <div className="overflow-y-auto p-3 flex-1">
+            {diario.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">No hay registros recientes</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {diario.map((item) => (
+                  <div key={item.fecha_trabajo} className="flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg">
+                    <span className="font-medium text-slate-700">{item.fecha_trabajo}</span>
+                    <div className="text-right">
+                      <span className="block text-sm text-slate-500">{item.total_piezas ?? 0} pzs</span>
+                      <span className="block font-bold text-emerald-600">${(item.total_ganado ?? 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {tarifaHoraria.length === 0 ? (
-          <p className="text-gray-500 text-center">No hay turnos cerrados</p>
-        ) : (
-          <div className="space-y-2">
-            {tarifaHoraria.map((item) => (
-              <div
-                key={item.fecha}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-              >
-                <span>{item.fecha}</span>
-                <span>{item.total_horas ?? 0} horas</span>
-                <span className="font-bold text-orange-600">
-                  ${(item.tarifa_horaria_real ?? 0).toFixed(2)}/hora
-                </span>
-              </div>
-            ))}
+        {/* Tarifa Horaria */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+            <Clock className="text-amber-500" size={20} />
+            <h3 className="font-semibold text-slate-800">Tarifa Horaria Real</h3>
           </div>
-        )}
-      </div>
-
-      {/* Resumen Semanal */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="text-green-600" size={24} />
-          <h3 className="text-lg font-bold text-gray-700">
-            Resumen Semanal
-          </h3>
+          <div className="overflow-y-auto p-3 flex-1">
+            {tarifa.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">No hay turnos cerrados</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {tarifa.map((item) => (
+                  <div key={item.fecha} className="flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg">
+                    <span className="font-medium text-slate-700">{item.fecha}</span>
+                    <div className="text-right">
+                      <span className="block text-sm text-slate-500">{item.total_horas ?? 0} hrs</span>
+                      <span className="block font-bold text-amber-600">${(item.tarifa_horaria_real ?? 0).toFixed(2)}/h</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {resumenSemanal.length === 0 ? (
-          <p className="text-gray-500 text-center">No hay datos</p>
-        ) : (
-          <div className="space-y-2">
-            {resumenSemanal.map((item) => (
-              <div
-                key={item.semana}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-              >
-                <span>{item.semana}</span>
-                <span>{item.total_piezas ?? 0} piezas</span>
-                <span className="font-bold text-green-600">
-                  ${(item.total_ganado ?? 0).toFixed(2)}
-                </span>
-              </div>
-            ))}
+        {/* Resumen Semanal */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+            <DollarSign className="text-emerald-600" size={20} />
+            <h3 className="font-semibold text-slate-800">Resumen Semanal</h3>
           </div>
-        )}
+          <div className="overflow-y-auto p-3 flex-1">
+            {semanal.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">No hay datos semanales</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {semanal.map((item) => (
+                  <div key={item.semana} className="flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg">
+                    <span className="font-medium text-slate-700">Semana {item.semana}</span>
+                    <div className="text-right">
+                      <span className="block text-sm text-slate-500">{item.total_piezas ?? 0} pzs</span>
+                      <span className="block font-bold text-emerald-600">${(item.total_ganado ?? 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )

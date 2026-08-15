@@ -1,56 +1,62 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useProduction } from '../../shared/hooks/useProduction'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { toast } from 'sonner'
-import { Plus, Minus, Save, Loader2, LogOut } from 'lucide-react'
+import { Plus, Minus, Save, Loader2, CheckCircle2 } from 'lucide-react'
 import { db, type RegistroLocal } from '../../shared/lib/db'
 
 export default function RegistroTrabajador() {
-  const { session, signOut } = useAuth()
+  const { session } = useAuth()
   const { prendas, operaciones, colores, loading } = useProduction()
 
   const [prendaSeleccionada, setPrendaSeleccionada] = useState<string>('')
   const [operacionSeleccionada, setOperacionSeleccionada] = useState<string>('')
+  // No necesitamos inicializar con un useEffect, un objeto vacío es suficiente y más rápido
   const [cantidades, setCantidades] = useState<Record<number, number>>({})
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => {
-    if (colores.length > 0) {
-      const inicial = colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {})
-      setCantidades(inicial)
-    }
-  }, [colores])
-
-  const valorTotal = useMemo(() => {
-    if (!operacionSeleccionada) return 0
-    const op = operaciones.find(o => o.id === Number(operacionSeleccionada))
-    if (!op) return 0
-    return Object.values(cantidades).reduce((sum, cant) => sum + cant * op.precio_fijo, 0)
-  }, [operacionSeleccionada, cantidades, operaciones])
-
+  // Cálculos derivados rápidos
   const operacionesFiltradas = useMemo(() => {
     if (!prendaSeleccionada) return []
     return operaciones.filter(op => op.prenda_id === Number(prendaSeleccionada))
   }, [prendaSeleccionada, operaciones])
 
-  if (!session) return <div>No autenticado</div>
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin text-blue-600" size={32} /></div>
+  const operacionActiva = useMemo(() => {
+    return operaciones.find(o => o.id === Number(operacionSeleccionada))
+  }, [operacionSeleccionada, operaciones])
+
+  const totalPiezas = useMemo(() => {
+    return Object.values(cantidades).reduce((sum, cant) => sum + cant, 0)
+  }, [cantidades])
+
+  const valorTotal = totalPiezas * (operacionActiva?.precio_fijo || 0)
+
+  if (!session) return null
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+        <Loader2 className="animate-spin mb-4" size={32} />
+        <p>Cargando catálogo...</p>
+      </div>
+    )
+  }
 
   const actualizarCantidad = (colorId: number, incremento: number) => {
-    setCantidades(prev => ({
-      ...prev,
-      [colorId]: Math.max(0, (prev[colorId] || 0) + incremento)
-    }))
+    setCantidades(prev => {
+      const cantidadActual = prev[colorId] || 0
+      const nuevaCantidad = Math.max(0, cantidadActual + incremento)
+      return { ...prev, [colorId]: nuevaCantidad }
+    })
   }
 
   const guardarRegistro = async () => {
-    if (!prendaSeleccionada || !operacionSeleccionada) return toast.error("Selecciona prenda y operación")
+    if (!operacionActiva || totalPiezas === 0) return
 
     const registrosLocales: RegistroLocal[] = Object.entries(cantidades)
       .filter(([, cant]) => cant > 0)
       .map(([colorId, cantidad]) => ({
         local_id: crypto.randomUUID(),
-        operacion_id: Number(operacionSeleccionada),
+        operacion_id: operacionActiva.id,
         color_id: Number(colorId),
         cantidad,
         trabajador_id: session.user.id,
@@ -59,91 +65,144 @@ export default function RegistroTrabajador() {
         sync_status: 'pending'
       }))
 
-    if (registrosLocales.length === 0) return toast.error("Ingresa al menos una cantidad mayor a cero")
-
     setGuardando(true)
     try {
       await db.registros_produccion.bulkAdd(registrosLocales)
       
-      toast.success(`Se guardaron ${registrosLocales.length} registros (Offline)`)
-      setCantidades(colores.reduce((acc, c) => ({ ...acc, [c.id]: 0 }), {}))
+      toast.success(`Se guardaron ${totalPiezas} piezas correctamente`, {
+        icon: <CheckCircle2 className="text-emerald-600" />
+      })
+      
+      // Resetear formulario
+      setCantidades({})
       setOperacionSeleccionada('')
     } catch (error) {
-      console.error(error)
+      console.error('Error guardando en Dexie:', error)
       toast.error("Error al guardar producción localmente")
     } finally {
       setGuardando(false)
     }
   }
 
+  const isBotonDeshabilitado = guardando || !operacionSeleccionada || totalPiezas === 0
+
   return (
-    <div className="max-w-md mx-auto p-4 bg-white rounded-xl shadow-lg mt-6 border border-gray-100">
-      <div className="flex justify-between items-center mb-6 border-b pb-4">
+    <div className="max-w-xl mx-auto p-4 md:p-6 bg-white rounded-xl shadow-sm border border-slate-200 mt-2 md:mt-6">
+      
+      {/* 1. SELECCIÓN DE PRENDA Y OPERACIÓN */}
+      <div className="space-y-5 mb-8">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">TIEMP - Producción</h2>
-          <p className="text-xs text-gray-500">Registro de Operaciones</p>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            1. ¿Qué prenda estás cosiendo?
+          </label>
+          <select
+            className="w-full p-3.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+            value={prendaSeleccionada}
+            onChange={(e) => { 
+              setPrendaSeleccionada(e.target.value)
+              setOperacionSeleccionada('') 
+            }}
+          >
+            <option value="">-- Selecciona una Prenda --</option>
+            {prendas.map(p => (
+              <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+            ))}
+          </select>
         </div>
-        <button onClick={signOut} className="text-gray-400 hover:text-red-500 transition-colors">
-          <LogOut size={20} />
-        </button>
+
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            2. ¿Qué operación realizaste?
+          </label>
+          <select
+            className="w-full p-3.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:opacity-50 disabled:bg-slate-100"
+            value={operacionSeleccionada}
+            onChange={e => setOperacionSeleccionada(e.target.value)}
+            disabled={!prendaSeleccionada}
+          >
+            <option value="">-- Selecciona una Operación --</option>
+            {operacionesFiltradas.map(op => (
+              <option key={op.id} value={op.id}>{op.nombre} (${op.precio_fijo})</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">1. Prenda</label>
-        <select
-          className="w-full p-3 border rounded-lg bg-gray-50"
-          value={prendaSeleccionada}
-          onChange={(e) => { setPrendaSeleccionada(e.target.value); setOperacionSeleccionada('') }}
-        >
-          <option value="">-- Selecciona Prenda --</option>
-          {prendas.map(p => <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>)}
-        </select>
+      {/* 2. INGRESO DE CANTIDADES POR COLOR */}
+      <div className="mb-8">
+        <label className="block text-sm font-semibold text-slate-700 mb-3">
+          3. Ingresa las cantidades
+        </label>
+        
+        <div className="grid gap-3">
+          {colores.map(color => {
+            const cantidad = cantidades[color.id] || 0;
+            return (
+              <div 
+                key={color.id} 
+                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                  cantidad > 0 ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-5 h-5 rounded-full border border-slate-300 shadow-sm" 
+                    style={{ backgroundColor: color.codigo_hex || '#ccc' }} 
+                  />
+                  <span className="font-medium text-slate-700">{color.nombre}</span>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => actualizarCantidad(color.id, -1)} 
+                    disabled={cantidad === 0}
+                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-white transition-colors"
+                    aria-label="Restar uno"
+                  >
+                    <Minus size={18} strokeWidth={2.5} />
+                  </button>
+                  
+                  <span className="text-xl font-bold text-slate-900 w-8 text-center tabular-nums">
+                    {cantidad}
+                  </span>
+                  
+                  <button 
+                    onClick={() => actualizarCantidad(color.id, 1)} 
+                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-emerald-600 transition-colors"
+                    aria-label="Sumar uno"
+                  >
+                    <Plus size={18} strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">2. Operación</label>
-        <select
-          className="w-full p-3 border rounded-lg bg-gray-50"
-          value={operacionSeleccionada}
-          onChange={e => setOperacionSeleccionada(e.target.value)}
-          disabled={!prendaSeleccionada}
-        >
-          <option value="">-- Selecciona Operación --</option>
-          {operacionesFiltradas.map(op => (
-            <option key={op.id} value={op.id}>{op.nombre} (${op.precio_fijo})</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-3 mb-8">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase">Cantidades por Color</h3>
-        {colores.map(color => (
-          <div key={color.id} className="flex items-center justify-between p-3 bg-gray-50 border rounded-lg">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: color.codigo_hex || '#ccc' }} />
-              <span className="font-medium text-gray-700">{color.nombre}</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button onClick={() => actualizarCantidad(color.id, -1)} className="p-1.5 bg-white border rounded hover:bg-red-50 text-red-600"><Minus size={16} /></button>
-              <span className="text-xl font-bold w-8 text-center">{cantidades[color.id] || 0}</span>
-              <button onClick={() => actualizarCantidad(color.id, 1)} className="p-1.5 bg-white border rounded hover:bg-green-50 text-green-600"><Plus size={16} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-100 flex justify-between items-center">
-        <span className="text-sm text-blue-800">Valor Estimado del Lote</span>
-        <span className="text-xl font-bold text-blue-900">${valorTotal.toFixed(2)}</span>
+      {/* 3. RESUMEN Y ACCIÓN */}
+      <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 flex justify-between items-center">
+        <div>
+          <span className="block text-sm text-slate-500 font-medium mb-1">Total de piezas</span>
+          <span className="text-2xl font-bold text-slate-900">{totalPiezas}</span>
+        </div>
+        <div className="text-right">
+          <span className="block text-sm text-slate-500 font-medium mb-1">Valor Generado</span>
+          <span className="text-2xl font-bold text-emerald-600">${valorTotal.toFixed(2)}</span>
+        </div>
       </div>
 
       <button
         onClick={guardarRegistro}
-        disabled={guardando || !operacionSeleccionada}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex justify-center items-center disabled:opacity-50"
+        disabled={isBotonDeshabilitado}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl flex justify-center items-center transition-all disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] shadow-sm"
       >
-        {guardando ? <Loader2 className="animate-spin mr-2" size={20} /> : <Save className="mr-2" size={20} />}
-        {guardando ? 'Guardando...' : 'Guardar Producción'}
+        {guardando ? (
+          <Loader2 className="animate-spin mr-2" size={20} />
+        ) : (
+          <Save className="mr-2" size={20} />
+        )}
+        {guardando ? 'Guardando...' : 'Confirmar Producción'}
       </button>
     </div>
   )
