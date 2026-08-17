@@ -76,14 +76,22 @@ export default function ProduccionHistory() {
                     <h3 className="font-bold text-slate-800 text-lg">
                       {item.operacion?.nombre ?? 'Operación eliminada'}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
                       <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded text-xs font-medium text-slate-600">
                         {item.color?.codigo_hex && (
                           <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shadow-sm" style={{ backgroundColor: item.color.codigo_hex }} />
                         )}
                         <span>{item.color?.nombre ?? 'Sin color'}</span>
                       </div>
-                      <span className="text-sm font-medium text-slate-700 border-l border-slate-300 pl-3">
+                      <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded text-xs font-bold">
+                        {item.talla || 'Única'}
+                      </span>
+                      {item.lote && (
+                        <span className="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-1 rounded text-xs font-bold uppercase">
+                          OP: {item.lote}
+                        </span>
+                      )}
+                      <span className="text-sm font-bold text-slate-700 border-l border-slate-300 pl-2">
                         {cantidad} piezas
                       </span>
                     </div>
