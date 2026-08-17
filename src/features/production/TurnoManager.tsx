@@ -114,41 +114,69 @@ export default function TurnoManager() {
   const iniciarTurno = async () => {
     setGuardando(true)
     try {
+      const localId = crypto.randomUUID()
+      const fechaActual = new Date().toISOString().split('T')[0]
+      const horaInicio = new Date().toISOString()
+
+      let isSynced = false
+      if (navigator.onLine) {
+        const { error } = await supabase.from('turnos').insert([{
+          local_id: localId,
+          trabajador_id: session.user.id,
+          fecha: fechaActual,
+          hora_inicio: horaInicio,
+          estado: 'abierto'
+        }])
+        if (!error) isSynced = true
+      }
+
       await db.turnos.add({
-        local_id: crypto.randomUUID(),
+        local_id: localId,
         trabajador_id: session.user.id,
-        fecha: new Date().toISOString().split('T')[0],
-        hora_inicio: new Date().toISOString(),
+        fecha: fechaActual,
+        hora_inicio: horaInicio,
         estado: 'abierto',
-        sync_status: 'pending' 
+        sync_status: isSynced ? 'synced' : 'pending' 
       })
-      toast.success("Turno iniciado exitosamente")
+      toast.success(isSynced ? "Turno iniciado en la Nube" : "Turno iniciado (Modo Offline)")
     } catch (error) {
       console.error(error)
-      toast.error("Error al iniciar turno localmente")
+      toast.error("Error al iniciar turno")
     } finally {
       setGuardando(false)
     }
   }
 
   const finalizarTurno = async () => {
-    if (!turnoActivo || !turnoActivo.id) return;
+    if (!turnoActivo || !turnoActivo.local_id) return;
     
     setGuardando(true)
     try {
-      const duracion = (Date.now() - new Date(turnoActivo.hora_inicio).getTime()) / 3600000
+      const horaFin = new Date().toISOString()
+      const duracion = (new Date(horaFin).getTime() - new Date(turnoActivo.hora_inicio).getTime()) / 3600000
 
-      await db.turnos.update(turnoActivo.id, {
-        hora_fin: new Date().toISOString(),
-        total_horas: duracion,
-        estado: 'cerrado',
-        sync_status: 'pending' 
-      })
+      let isSynced = false
+      if (navigator.onLine) {
+        const { error } = await supabase.from('turnos')
+          .update({ hora_fin: horaFin, total_horas: duracion, estado: 'cerrado' })
+          .eq('local_id', turnoActivo.local_id)
+        
+        if (!error) isSynced = true
+      }
+
+      if (turnoActivo.id) {
+        await db.turnos.update(turnoActivo.id, {
+          hora_fin: horaFin,
+          total_horas: duracion,
+          estado: 'cerrado',
+          sync_status: isSynced ? 'synced' : 'pending' 
+        })
+      }
       
-      toast.success(`Turno finalizado: ${duracion.toFixed(2)} horas completadas`)
+      toast.success(`Turno finalizado: ${duracion.toFixed(2)} hrs`)
     } catch (err) {
       console.error(err)
-      toast.error("Error al cerrar turno localmente")
+      toast.error("Error al cerrar turno")
     } finally {
       setGuardando(false)
     }
