@@ -3,15 +3,17 @@ import type { Database } from '../../types/supabase';
 
 export type SyncStatus = 'synced' | 'pending' | 'error';
 
-// 1. Tipos 100% extraídos de Supabase
+// 1. Tipos extraídos de Supabase
 export type Prenda = Database['public']['Tables']['prendas']['Row'];
 export type Operacion = Database['public']['Tables']['operaciones']['Row'];
 export type Color = Database['public']['Tables']['colores']['Row'];
 
-// 2. Tipos de producción enriquecidos para uso local
+// 2. Tipos de producción para uso local
 export type RegistroLocal = Omit<Database['public']['Tables']['registros_produccion']['Row'], 'id'> & {
   id?: number; // Auto-incremental de Dexie
   sync_status: SyncStatus;
+  talla?: string | null;
+  lote?: string | null;
 };
 
 export type TurnoLocal = Omit<Database['public']['Tables']['turnos']['Row'], 'id' | 'hora_fin' | 'total_horas'> & {
