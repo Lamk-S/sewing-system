@@ -1,209 +1,229 @@
-import { useState, useMemo } from 'react'
-import { useProduction } from '../../shared/hooks/useProduction'
+import { useState, useEffect } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, type Prenda, type Operacion, type Color } from '../../shared/lib/db' // <-- IMPORTAMOS LOS TIPOS
+import { supabase } from '../../shared/lib/supabase'
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { toast } from 'sonner'
-import { Plus, Minus, Save, Loader2, CheckCircle2 } from 'lucide-react'
-import { db, type RegistroLocal } from '../../shared/lib/db'
+import { CheckCircle2, Loader2, Tags, Hash } from 'lucide-react'
+
+const TALLAS_DISPONIBLES = ['Única', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34']
 
 export default function RegistroTrabajador() {
   const { session } = useAuth()
-  const { prendas, operaciones, colores, loading } = useProduction()
+  
+  const [prendas, setPrendas] = useState<Prenda[]>([])
+  const [operaciones, setOperaciones] = useState<Operacion[]>([])
+  const [colores, setColores] = useState<Color[]>([])
+  const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(true)
 
-  const [prendaSeleccionada, setPrendaSeleccionada] = useState<string>('')
-  const [operacionSeleccionada, setOperacionSeleccionada] = useState<string>('')
-  // No necesitamos inicializar con un useEffect, un objeto vacío es suficiente y más rápido
-  const [cantidades, setCantidades] = useState<Record<number, number>>({})
-  const [guardando, setGuardando] = useState(false)
+  const [prendaId, setPrendaId] = useState('')
+  const [operacionId, setOperacionId] = useState('')
+  const [colorId, setColorId] = useState('')
+  const [cantidad, setCantidad] = useState('')
+  const [talla, setTalla] = useState('Única')
+  const [lote, setLote] = useState('')
+  
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Cálculos derivados rápidos
-  const operacionesFiltradas = useMemo(() => {
-    if (!prendaSeleccionada) return []
-    return operaciones.filter(op => op.prenda_id === Number(prendaSeleccionada))
-  }, [prendaSeleccionada, operaciones])
+  // Verificar si hay un turno abierto
+  const turnoActivo = useLiveQuery(
+    async () => {
+      if (!session) return null;
+      return await db.turnos
+        .where('trabajador_id').equals(session.user.id)
+        .filter(t => t.estado === 'abierto')
+        .first();
+    },
+    [session]
+  )
 
-  const operacionActiva = useMemo(() => {
-    return operaciones.find(o => o.id === Number(operacionSeleccionada))
-  }, [operacionSeleccionada, operaciones])
+  useEffect(() => {
+    const loadCatalogs = async () => {
+      const [pRes, oRes, cRes] = await Promise.all([
+        supabase.from('prendas').select('*').eq('activo', true),
+        supabase.from('operaciones').select('*').eq('activo', true),
+        supabase.from('colores').select('*').eq('activo', true)
+      ])
+      
+      if (pRes.data) setPrendas(pRes.data)
+      if (oRes.data) setOperaciones(oRes.data)
+      if (cRes.data) setColores(cRes.data)
+      
+      setIsLoadingCatalogs(false)
+    }
+    loadCatalogs()
+  }, [])
 
-  const totalPiezas = useMemo(() => {
-    return Object.values(cantidades).reduce((sum, cant) => sum + cant, 0)
-  }, [cantidades])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session || !turnoActivo) {
+      toast.error("Debes iniciar tu turno primero en la pestaña 'Mis Turnos'.")
+      return
+    }
 
-  const valorTotal = totalPiezas * (operacionActiva?.precio_fijo || 0)
+    if (Number(cantidad) <= 0) {
+      toast.error("La cantidad debe ser mayor a 0")
+      return
+    }
 
-  if (!session) return null
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
-        <Loader2 className="animate-spin mb-4" size={32} />
-        <p>Cargando catálogo...</p>
-      </div>
-    )
-  }
-
-  const actualizarCantidad = (colorId: number, incremento: number) => {
-    setCantidades(prev => {
-      const cantidadActual = prev[colorId] || 0
-      const nuevaCantidad = Math.max(0, cantidadActual + incremento)
-      return { ...prev, [colorId]: nuevaCantidad }
-    })
-  }
-
-  const guardarRegistro = async () => {
-    if (!operacionActiva || totalPiezas === 0) return
-
-    const registrosLocales: RegistroLocal[] = Object.entries(cantidades)
-      .filter(([, cant]) => cant > 0)
-      .map(([colorId, cantidad]) => ({
-        local_id: crypto.randomUUID(),
-        operacion_id: operacionActiva.id,
-        color_id: Number(colorId),
-        cantidad,
-        trabajador_id: session.user.id,
-        fecha_trabajo: new Date().toISOString().split('T')[0],
-        created_at: new Date().toISOString(),
-        sync_status: 'pending'
-      }))
-
-    setGuardando(true)
+    setIsSaving(true)
     try {
-      await db.registros_produccion.bulkAdd(registrosLocales)
-      
-      toast.success(`Se guardaron ${totalPiezas} piezas correctamente`, {
-        icon: <CheckCircle2 className="text-emerald-600" />
+      await db.registros_produccion.add({
+        local_id: crypto.randomUUID(),
+        trabajador_id: session.user.id,
+        operacion_id: Number(operacionId),
+        color_id: Number(colorId),
+        cantidad: Number(cantidad),
+        talla: talla,
+        lote: lote.trim().toUpperCase(),
+        fecha_trabajo: turnoActivo.fecha,
+        sync_status: 'pending',
+        created_at: new Date().toISOString()
       })
-      
-      // Resetear formulario
-      setCantidades({})
-      setOperacionSeleccionada('')
+
+      toast.success("Producción registrada correctamente")
+      setCantidad('')
     } catch (error) {
-      console.error('Error guardando en Dexie:', error)
-      toast.error("Error al guardar producción localmente")
+      console.error(error)
+      toast.error("Ocurrió un error al guardar")
     } finally {
-      setGuardando(false)
+      setIsSaving(false)
     }
   }
 
-  const isBotonDeshabilitado = guardando || !operacionSeleccionada || totalPiezas === 0
+  // Filtrar operaciones basadas en la prenda seleccionada
+  const operacionesFiltradas = operaciones.filter(o => String(o.prenda_id) === prendaId)
+
+  if (isLoadingCatalogs) {
+    return <div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-slate-400" size={32} /></div>
+  }
 
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-6 bg-white rounded-xl shadow-sm border border-slate-200 mt-2 md:mt-6">
-      
-      {/* 1. SELECCIÓN DE PRENDA Y OPERACIÓN */}
-      <div className="space-y-5 mb-8">
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            1. ¿Qué prenda estás cosiendo?
-          </label>
-          <select
-            className="w-full p-3.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-            value={prendaSeleccionada}
-            onChange={(e) => { 
-              setPrendaSeleccionada(e.target.value)
-              setOperacionSeleccionada('') 
-            }}
-          >
-            <option value="">-- Selecciona una Prenda --</option>
-            {prendas.map(p => (
-              <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            2. ¿Qué operación realizaste?
-          </label>
-          <select
-            className="w-full p-3.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:opacity-50 disabled:bg-slate-100"
-            value={operacionSeleccionada}
-            onChange={e => setOperacionSeleccionada(e.target.value)}
-            disabled={!prendaSeleccionada}
-          >
-            <option value="">-- Selecciona una Operación --</option>
-            {operacionesFiltradas.map(op => (
-              <option key={op.id} value={op.id}>{op.nombre} (${op.precio_fijo})</option>
-            ))}
-          </select>
-        </div>
+    <div className="max-w-lg mx-auto bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-slate-200 mt-4 animate-in fade-in duration-300">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-slate-800">Registrar Producción</h2>
+        <p className="text-slate-500 text-sm">Añade las piezas completadas a tu registro diario.</p>
       </div>
 
-      {/* 2. INGRESO DE CANTIDADES POR COLOR */}
-      <div className="mb-8">
-        <label className="block text-sm font-semibold text-slate-700 mb-3">
-          3. Ingresa las cantidades
-        </label>
+      {!turnoActivo && (
+        <div className="bg-amber-50 border border-amber-200 text-amber
+        -800 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
+           <span className="text-xl">⚠️</span>
+           <p>No tienes un turno iniciado. Ve a la pestaña de "Mis Turnos" para registrar tu hora de entrada antes de añadir producción.</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className={`space-y-5 ${!turnoActivo ? 'opacity-50 pointer-events-none' : ''}`}>
         
-        <div className="grid gap-3">
-          {colores.map(color => {
-            const cantidad = cantidades[color.id] || 0;
-            return (
-              <div 
-                key={color.id} 
-                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                  cantidad > 0 ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-5 h-5 rounded-full border border-slate-300 shadow-sm" 
-                    style={{ backgroundColor: color.codigo_hex || '#ccc' }} 
-                  />
-                  <span className="font-medium text-slate-700">{color.nombre}</span>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => actualizarCantidad(color.id, -1)} 
-                    disabled={cantidad === 0}
-                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-white transition-colors"
-                    aria-label="Restar uno"
-                  >
-                    <Minus size={18} strokeWidth={2.5} />
-                  </button>
-                  
-                  <span className="text-xl font-bold text-slate-900 w-8 text-center tabular-nums">
-                    {cantidad}
-                  </span>
-                  
-                  <button 
-                    onClick={() => actualizarCantidad(color.id, 1)} 
-                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-emerald-600 transition-colors"
-                    aria-label="Sumar uno"
-                  >
-                    <Plus size={18} strokeWidth={2.5} />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+        {/* Fila 1: Prenda y Operación */}
+        <div className="space-y-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">1. Selecciona la Prenda</label>
+            <select
+              value={prendaId}
+              onChange={(e) => {
+                setPrendaId(e.target.value)
+                setOperacionId('')
+              }}
+              className="w-full p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              required
+            >
+              <option value="" disabled>-- Elige una prenda --</option>
+              {prendas.map(p => (
+                <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+              ))}
+            </select>
+          </div>
 
-      {/* 3. RESUMEN Y ACCIÓN */}
-      <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 flex justify-between items-center">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Operación Realizada</label>
+            <select
+              value={operacionId}
+              onChange={(e) => setOperacionId(e.target.value)}
+              className="w-full p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:bg-slate-100"
+              required
+              disabled={!prendaId}
+            >
+              <option value="" disabled>-- Elige la operación --</option>
+              {operacionesFiltradas.map(o => (
+                <option key={o.id} value={o.id}>{o.nombre} - ${o.precio_fijo.toFixed(2)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Fila 2: Talla, Color y Lote (Variantes) */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Color</label>
+            <select
+              value={colorId}
+              onChange={(e) => setColorId(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              required
+            >
+              <option value="" disabled>-- Elige --</option>
+              {colores.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 mb-1.5">
+              <Tags size={14} className="text-slate-400" /> Talla
+            </label>
+            <select
+              value={talla}
+              onChange={(e) => setTalla(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              required
+            >
+              {TALLAS_DISPONIBLES.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-span-2">
+             <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 mb-1.5">
+              <Hash size={14} className="text-slate-400" /> Lote / OP (Opcional)
+            </label>
+            <input
+              type="text"
+              value={lote}
+              onChange={(e) => setLote(e.target.value)}
+              placeholder="Ej. OP-1042"
+              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all uppercase"
+            />
+            <p className="text-xs text-slate-500 mt-1">Identificador del corte o bloque de producción.</p>
+          </div>
+        </div>
+
+        {/* Fila 3: Cantidad y Botón */}
         <div>
-          <span className="block text-sm text-slate-500 font-medium mb-1">Total de piezas</span>
-          <span className="text-2xl font-bold text-slate-900">{totalPiezas}</span>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cantidad de Piezas</label>
+          <div className="flex gap-3">
+            <input
+              type="number"
+              min="1"
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              className="w-32 p-3 text-center text-lg font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              placeholder="0"
+              required
+            />
+            <button
+              type="submit"
+              disabled={isSaving || !turnoActivo}
+              className="flex-1 bg-primary text-primary-foreground font-bold p-3 rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 flex justify-center items-center gap-2 active:scale-[0.98] shadow-sm"
+            >
+              {isSaving ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
+              {isSaving ? 'Guardando...' : 'Registrar Bulto'}
+            </button>
+          </div>
         </div>
-        <div className="text-right">
-          <span className="block text-sm text-slate-500 font-medium mb-1">Valor Generado</span>
-          <span className="text-2xl font-bold text-emerald-600">${valorTotal.toFixed(2)}</span>
-        </div>
-      </div>
-
-      <button
-        onClick={guardarRegistro}
-        disabled={isBotonDeshabilitado}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl flex justify-center items-center transition-all disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] shadow-sm"
-      >
-        {guardando ? (
-          <Loader2 className="animate-spin mr-2" size={20} />
-        ) : (
-          <Save className="mr-2" size={20} />
-        )}
-        {guardando ? 'Guardando...' : 'Confirmar Producción'}
-      </button>
+      </form>
     </div>
   )
 }
