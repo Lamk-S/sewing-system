@@ -1,303 +1,173 @@
-'use client'
+import { useState, useMemo } from 'react'
+import { Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
-import { useState, useEffect } from 'react'
-
-import type { ColumnDef } from '@tanstack/react-table'
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
-
-import { Button } from './button'
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './table'
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './dialog'
-
-import { Badge } from './badge'
-import { Input } from './input'
-
-import { ChevronDown, Search, MoreHorizontal } from 'lucide-react'
-
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  onEdit: (item: TData) => void
-  onDelete: (id: number) => void
-  searchKey?: keyof TData
-  title?: string
-  addButtonText?: string
-  onAddNew?: () => void
+type Column<T> = {
+  header: string
+  accessorKey: string
+  cell?: (props: { row: { original: T } }) => React.ReactNode
 }
 
-export function DataTable<TData extends { id: number }, TValue>({
-  columns,
-  data,
-  onEdit,
+type DataTableProps<T> = {
+  data: T[]
+  columns: Column<T>[]
+  onEdit?: (item: T) => void
+  onDelete?: (id: number) => void
+  pageSize?: number // Opcional, por defecto 10
+}
+
+export function DataTable<T extends { id?: number }>({ 
+  data, 
+  columns, 
+  onEdit, 
   onDelete,
-  searchKey = 'nombre' as keyof TData,
-  title = 'Datos',
-  addButtonText = 'Nuevo',
-  onAddNew,
-}: DataTableProps<TData, TValue>) {
-  const [search, setSearch] = useState('')
-  const [filteredData, setFilteredData] = useState<TData[]>(data)
+  pageSize = 10 
+}: DataTableProps<T>) {
+  
+  const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setFilteredData(data)
-      return
-    }
-
-    const filtered = data.filter((item) => {
-      const value = String(item[searchKey] ?? '').toLowerCase()
-      return value.includes(search.toLowerCase())
+  const filteredData = useMemo(() => {
+    if (!searchTerm) return data
+    
+    const lowercasedSearch = searchTerm.toLowerCase()
+    return data.filter((item) => {
+      return Object.values(item).some((value) => 
+        String(value).toLowerCase().includes(lowercasedSearch)
+      )
     })
+  }, [data, searchTerm])
 
-    setFilteredData(filtered)
-  }, [data, search, searchKey])
-
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  })
+  const totalPages = Math.ceil(filteredData.length / pageSize) || 1
+  const validCurrentPage = Math.min(currentPage, totalPages)
+  
+  const paginatedData = useMemo(() => {
+    const startIndex = (validCurrentPage - 1) * pageSize
+    return filteredData.slice(startIndex, startIndex + pageSize)
+  }, [filteredData, validCurrentPage, pageSize])
 
   return (
-    <div className="w-full">
-
-      {/* Header */}
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-
-          <Badge variant="secondary">
-            {filteredData.length}
-          </Badge>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      
+      {/* HEADER: Buscador */}
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar en todos los campos..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1) // Volver a la pág 1 al buscar
+            }}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-white"
+          />
         </div>
-
-        <div className="flex items-center gap-2">
-
-          {onAddNew && (
-            <Button onClick={onAddNew}>
-              + {addButtonText}
-            </Button>
-          )}
-
-          <div className="relative w-64">
-
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-
-            <Input
-              placeholder={`Buscar ${title.toLowerCase()}...`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-
-          </div>
-
+        <div className="text-sm text-slate-500 font-medium hidden sm:block">
+          Total: {filteredData.length} registros
         </div>
-
       </div>
 
-      {/* Tabla */}
-
-      <div className="rounded-md border bg-card">
-
-        <Table>
-
-          <TableHeader>
-
-            {table.getHeaderGroups().map((headerGroup) => (
-
-              <TableRow key={headerGroup.id}>
-
-                {headerGroup.headers.map((header) => (
-
-                  <TableHead key={header.id}>
-
-                    {header.isPlaceholder ? null : (
-                      <>
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-
-                        {header.column.getCanSort() && (
-                          <ChevronDown className="ml-2 h-4 w-4 inline" />
-                        )}
-                      </>
-                    )}
-
-                  </TableHead>
-
-                ))}
-
-                <TableHead className="text-right">
-                  Acciones
-                </TableHead>
-
-              </TableRow>
-
-            ))}
-
-          </TableHeader>
-
-          <TableBody>
-
-            {table.getRowModel().rows.length ? (
-
-              table.getRowModel().rows.map((row) => (
-
-                <TableRow key={row.id}>
-
-                  {row.getVisibleCells().map((cell) => (
-
-                    <TableCell key={cell.id}>
-
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-
-                    </TableCell>
-
-                  ))}
-
-                  <TableCell className="text-right">
-
-                    <DropdownActions
-                      onEdit={() => onEdit(row.original)}
-                      onDelete={() => onDelete(row.original.id)}
-                    />
-
-                  </TableCell>
-
-                </TableRow>
-
-              ))
-
+      {/* BODY: Tabla */}
+      <div className="overflow-x-auto scrollbar-thin">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
+              {columns.map((col, idx) => (
+                <th key={idx} className="p-4 font-semibold whitespace-nowrap">
+                  {col.header}
+                </th>
+              ))}
+              {(onEdit || onDelete) && (
+                <th className="p-4 font-semibold text-right">Acciones</th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {paginatedData.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="p-8 text-center text-slate-500">
+                  No se encontraron resultados.
+                </td>
+              </tr>
             ) : (
+              paginatedData.map((row, rowIndex) => (
+                <tr key={row.id || rowIndex} className="hover:bg-slate-50 transition-colors group">
+                  {columns.map((col, colIndex) => {
+                    const keys = col.accessorKey.split('.')
+                    const value = keys.reduce((obj: unknown, key: string) => {
+                      if (obj && typeof obj === 'object') {
+                        return (obj as Record<string, unknown>)[key]
+                      }
+                      return undefined
+                    }, row as unknown) as React.ReactNode
 
-              <TableRow>
-
-                <TableCell
-                  colSpan={columns.length + 1}
-                  className="h-24 text-center"
-                >
-
-                  {search
-                    ? 'No se encontraron resultados.'
-                    : `No hay ${title.toLowerCase()} disponibles.`}
-
-                </TableCell>
-
-              </TableRow>
-
+                    return (
+                      <td key={colIndex} className="p-4 text-sm text-slate-700">
+                        {col.cell ? col.cell({ row: { original: row } }) : value}
+                      </td>
+                    )
+                  })}
+                  {(onEdit || onDelete) && (
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                        {onEdit && (
+                          <button
+                            onClick={() => onEdit(row)}
+                            className="p-2 lg:p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg lg:rounded-md transition-colors active:scale-95"
+                            title="Editar"
+                            aria-label="Editar registro"
+                          >
+                            <Edit size={18} className="lg:w-4 lg:h-4" />
+                          </button>
+                        )}
+                        {onDelete && row.id && (
+                          <button
+                            onClick={() => onDelete(row.id!)}
+                            className="p-2 lg:p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg lg:rounded-md transition-colors active:scale-95"
+                            title="Eliminar"
+                            aria-label="Eliminar registro"
+                          >
+                            <Trash2 size={18} className="lg:w-4 lg:h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))
             )}
-
-          </TableBody>
-
-        </Table>
-
+          </tbody>
+        </table>
       </div>
 
-    </div>
-  )
-}
-
-function DropdownActions({
-  onEdit,
-  onDelete,
-}: {
-  onEdit: () => void
-  onDelete: () => void
-}) {
-
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-
-      <DialogTrigger asChild>
-
-        <Button variant="ghost" className="h-8 w-8 p-0">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-
-      </DialogTrigger>
-
-      <DialogContent className="sm:max-w-106.25">
-
-        <DialogHeader>
-
-          <DialogTitle>
-            Acciones
-          </DialogTitle>
-
-          <DialogDescription>
-            Selecciona una acción para este registro
-          </DialogDescription>
-
-        </DialogHeader>
-
-        <div className="grid gap-4 py-4">
-
-          <Button
-            variant="outline"
-            onClick={() => {
-              onEdit()
-              setOpen(false)
-            }}
-          >
-            ✏️ Editar
-          </Button>
-
-          <Button
-            variant="destructive"
-            onClick={() => {
-              onDelete()
-              setOpen(false)
-            }}
-          >
-            🗑️ Eliminar
-          </Button>
-
+      {/* FOOTER: Paginación */}
+      {totalPages > 1 && (
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+          <p className="text-sm text-slate-500">
+            Mostrando pág <span className="font-semibold text-slate-700">{validCurrentPage}</span> de <span className="font-semibold text-slate-700">{totalPages}</span>
+          </p>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={validCurrentPage === 1}
+              aria-label="Página anterior"
+              className="p-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={validCurrentPage === totalPages}
+              aria-label="Página siguiente"
+              className="p-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
-
-        <DialogFooter>
-
-          <Button
-            variant="outline"
-            onClick={() => setOpen(false)}
-          >
-            Cancelar
-          </Button>
-
-        </DialogFooter>
-
-      </DialogContent>
-
-    </Dialog>
+      )}
+    </div>
   )
 }
