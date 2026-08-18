@@ -7,7 +7,8 @@ import ColoresList from './ColoresAdmin/ColoresList'
 import OperacionesList from './OperacionesAdmin/OperacionesList'
 import HistorialGlobal from './HistorialGlobal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/components/ui/tabs'
-import { Users, LayoutDashboard, Calendar as CalendarIcon } from 'lucide-react'
+import { Users, LayoutDashboard, Calendar as CalendarIcon, FileSpreadsheet, FileText, AlertCircle, History, Shirt, Scissors, Palette } from 'lucide-react'
+import { exportToExcel, exportToPDF } from '../../shared/lib/exportUtils'
 
 type RawRanking = {
   id: string
@@ -28,7 +29,7 @@ type RawEficiencia = {
   eficiencia: number
 }
 
-type TrabajadorMetrics = {
+interface TrabajadorMetrics {
   id: string
   nombres: string
   apellidos: string
@@ -37,13 +38,22 @@ type TrabajadorMetrics = {
   total_horas: number
   eficiencia: number
   fecha?: string
+  [key: string]: unknown 
 }
+
+// 1. Componente extraído para limpiar el JSX principal
+const MetricCard = ({ title, value, borderClass = 'border-slate-200' }: { title: string; value: string | number; borderClass?: string }) => (
+  <div className={`p-5 bg-white shadow-sm rounded-xl border ${borderClass} flex flex-col justify-center`}>
+    <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+    <p className="text-3xl font-bold text-slate-900 tracking-tight">{value}</p>
+  </div>
+)
 
 export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard-metrics', fromDate, toDate],
     queryFn: async () => {
       let qRanking = supabase.from('v_ranking_trabajadores').select('*')
@@ -60,6 +70,9 @@ export default function AdminDashboard() {
 
       const [r1, r2] = await Promise.all([qRanking, qEficiencia])
       
+      if (r1.error) throw r1.error
+      if (r2.error) throw r2.error
+
       const rawRanking = (r1.data as unknown as RawRanking[]) || []
       const rawEficiencia = (r2.data as unknown as RawEficiencia[]) || []
 
@@ -77,10 +90,10 @@ export default function AdminDashboard() {
         return acc
       }, {} as Record<string, TrabajadorMetrics>)
 
-      const ranking: TrabajadorMetrics[] = (Object.values(mapRanking) as TrabajadorMetrics[])
+      const ranking: TrabajadorMetrics[] = Object.values(mapRanking)
         .sort((a, b) => b.total_ganado - a.total_ganado)
         
-      const eficiencia: TrabajadorMetrics[] = (Object.values(mapEficiencia) as TrabajadorMetrics[])
+      const eficiencia: TrabajadorMetrics[] = Object.values(mapEficiencia)
         .map((e) => ({
           ...e,
           eficiencia: e.total_horas > 0 ? (e.total_ganado / e.total_horas) : 0
@@ -94,11 +107,12 @@ export default function AdminDashboard() {
   const rankingData = data?.ranking || []
   const eficienciaData = data?.eficiencia || []
 
-  // Métricas Globales
+  // Métricas Globales calculadas eficientemente
   const totalTrabajadoresPeriodo = rankingData.length
   const totalPiezasPeriodo = rankingData.reduce((acc, curr) => acc + curr.total_piezas, 0)
   const totalGanadoPeriodo = rankingData.reduce((acc, curr) => acc + curr.total_ganado, 0)
 
+  // Manejadores de fechas robustos
   const setHoy = () => {
     const today = new Date().toLocaleDateString('en-CA')
     setFromDate(today)
@@ -107,9 +121,10 @@ export default function AdminDashboard() {
 
   const setSemana = () => {
     const now = new Date()
-    const first = new Date(now.getTime())
-    first.setDate(now.getDate() - now.getDay() + 1)
-    const last = new Date(first.getTime())
+    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay() 
+    const first = new Date(now)
+    first.setDate(now.getDate() - dayOfWeek + 1)
+    const last = new Date(first)
     last.setDate(first.getDate() + 6)
     setFromDate(first.toLocaleDateString('en-CA'))
     setToDate(last.toLocaleDateString('en-CA'))
@@ -124,131 +139,218 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-          <LayoutDashboard className="text-primary" />
+    <div className="container mx-auto max-w-7xl animate-in fade-in duration-300">
+      
+      {/* HEADER */}
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-2">
+          <LayoutDashboard className="text-primary" size={28} aria-hidden="true" />
           Panel de Administración
         </h1>
-        <p className="text-slate-500 mt-1">
+        <p className="text-sm md:text-base text-slate-500 mt-1">
           Supervisión de producción, eficiencia y gestión de catálogos.
         </p>
       </div>
 
-      {/* FILTROS INTELIGENTES */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div className="flex flex-wrap items-center gap-3">
-          <CalendarIcon className="text-slate-400" size={20} />
-          <input 
-            type="date" 
-            value={fromDate} 
-            onChange={(e) => setFromDate(e.target.value)} 
-            className="border border-slate-300 text-sm p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-          />
-          <span className="text-slate-400">hasta</span>
-          <input 
-            type="date" 
-            value={toDate} 
-            onChange={(e) => setToDate(e.target.value)} 
-            className="border border-slate-300 text-sm p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-          />
+      {/* CONTROLES: FILTROS Y EXPORTACIÓN */}
+      <div className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col lg:flex-row gap-5 justify-between items-start lg:items-center">
+        
+        <div className="flex flex-col md:flex-row flex-wrap items-start md:items-center gap-4 w-full lg:w-auto">
+          {/* Inputs de Fecha */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <CalendarIcon className="text-slate-400 hidden sm:block shrink-0" size={20} aria-hidden="true" />
+            <input 
+              type="date" 
+              aria-label="Fecha de inicio"
+              value={fromDate} 
+              onChange={(e) => setFromDate(e.target.value)} 
+              className="flex-1 md:w-30 border border-slate-300 text-sm p-2.5 md:p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
+            />
+            <span className="text-slate-400 text-sm font-medium">a</span>
+            <input 
+              type="date" 
+              aria-label="Fecha de fin"
+              value={toDate} 
+              onChange={(e) => setToDate(e.target.value)} 
+              className="flex-1 md:w-30 border border-slate-300 text-sm p-2.5 md:p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
+            />
+          </div>
+          
+          {/* Botones de Rango Rápido */}
+          <div className="flex gap-2 w-full md:w-auto md:border-l md:border-slate-200 md:pl-4">
+            <button onClick={setHoy} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Hoy</button>
+            <button onClick={setSemana} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Semana</button>
+            <button onClick={setMes} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Mes</button>
+          </div>
         </div>
         
-        <div className="flex gap-2">
-          <button onClick={setHoy} className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Hoy</button>
-          <button onClick={setSemana} className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Semana</button>
-          <button onClick={setMes} className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Mes</button>
+        {/* Exportación */}
+        <div className="flex gap-3 w-full lg:w-auto pt-4 lg:pt-0 border-t border-slate-100 lg:border-0">
+          <button
+            onClick={() => exportToExcel(rankingData, `Ranking_${new Date().toISOString().split('T')[0]}`)}
+            disabled={rankingData.length === 0 || isLoading}
+            aria-label="Exportar a Excel"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2.5 md:py-2 rounded-lg font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-50 text-sm focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"
+          >
+            <FileSpreadsheet size={18} />
+            <span>Excel</span>
+          </button>
+          <button
+            onClick={() => exportToPDF(
+              rankingData, 
+              [
+                { header: 'Nombres', dataKey: 'nombres' },
+                { header: 'Apellidos', dataKey: 'apellidos' },
+                { header: 'Piezas', dataKey: 'total_piezas' },
+                { header: 'Total Ganado', dataKey: 'total_ganado' }
+              ],
+              `Ranking_${new Date().toISOString().split('T')[0]}`,
+              `Reporte de Producción (Destajo)`
+            )}
+            disabled={rankingData.length === 0 || isLoading}
+            aria-label="Exportar a PDF"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200 px-4 py-2.5 md:py-2 rounded-lg font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 text-sm focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
+          >
+            <FileText size={18} />
+            <span>PDF</span>
+          </button>
         </div>
       </div>
 
-      {/* MÉTRICAS */}
-      {isLoading ? (
-        <div className="animate-pulse grid md:grid-cols-3 gap-4 mb-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-200 rounded-xl"></div>)}
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <div className="p-5 bg-white shadow-sm rounded-xl border border-slate-200">
-            <p className="text-sm font-medium text-slate-500 mb-1">Trabajadores Activos</p>
-            <p className="text-3xl font-bold text-slate-900">{totalTrabajadoresPeriodo}</p>
-          </div>
-          <div className="p-5 bg-white shadow-sm rounded-xl border border-slate-200">
-            <p className="text-sm font-medium text-slate-500 mb-1">Piezas Confeccionadas</p>
-            <p className="text-3xl font-bold text-slate-900">{totalPiezasPeriodo}</p>
-          </div>
-          <div className="p-5 bg-white shadow-sm rounded-xl border border-slate-200 border-l-4 border-l-emerald-500">
-            <p className="text-sm font-medium text-slate-500 mb-1">Inversión / Pago Total</p>
-            <p className="text-3xl font-bold text-emerald-600">
-              ${totalGanadoPeriodo.toFixed(2)}
-            </p>
+      {/* ESTADO DE ERROR */}
+      {isError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800">
+          <AlertCircle className="shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="font-semibold text-sm">Error de conexión</h3>
+            <p className="text-sm opacity-90">No pudimos cargar los datos. Verifica tu conexión o intenta recargar la página.</p>
           </div>
         </div>
       )}
 
-      {/* RANKING Y EFICIENCIA */}
+      {/* MÉTRICAS */}
+      {isLoading ? (
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          {[1, 2, 3].map(i => <div key={i} className="h-26 bg-slate-200 animate-pulse rounded-xl" />)}
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <MetricCard title="Trabajadores Activos" value={totalTrabajadoresPeriodo} />
+          <MetricCard title="Piezas Confeccionadas" value={totalPiezasPeriodo} />
+          <MetricCard title="Inversión / Pago Total" value={`$${totalGanadoPeriodo.toFixed(2)}`} />
+        </div>
+      )}
+
+      {/* RANKING Y EFICIENCIA (RSPONSIVE HEIGHTS) */}
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-96 overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <Users size={18} className="text-primary" />
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-80 md:h-96 xl:h-112.5">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
+            <Users size={18} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-slate-800">Ranking de Producción</h2>
           </div>
-          <div className="overflow-y-auto p-2">
-            {rankingData.length === 0 && !isLoading && (
-              <p className="text-slate-500 text-sm py-8 text-center">No hay registros en este periodo.</p>
-            )}
-            {rankingData.map((r, i) => (
-              <div key={`${r.id}-${r.fecha}-${i}`} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0">
-                <span className="font-medium text-slate-700">{r.nombres} {r.apellidos}</span>
-                <div className="text-right">
-                  <span className="block text-sm text-slate-500">{r.total_piezas ?? 0} piezas</span>
-                  <span className="block font-bold text-emerald-600">${r.total_ganado?.toFixed(2) ?? '0.00'}</span>
-                </div>
+          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin">
+            {rankingData.length === 0 && !isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-37.5 text-slate-400">
+                <LayoutDashboard size={32} className="mb-2 opacity-50" />
+                <p className="text-sm font-medium">Sin datos en este periodo</p>
               </div>
-            ))}
+            ) : (
+              rankingData.map((r) => (
+                <div key={r.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0 group">
+                  <span className="font-medium text-slate-700 group-hover:text-primary transition-colors">{r.nombres} {r.apellidos}</span>
+                  <div className="text-right">
+                    <span className="block text-sm text-slate-500">{r.total_piezas} piezas</span>
+                    <span className="block font-bold text-emerald-600">${r.total_ganado.toFixed(2)}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-96 overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <CalendarIcon size={18} className="text-primary" />
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-80 md:h-96 xl:h-112.5">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
+            <CalendarIcon size={18} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-slate-800">Eficiencia por Hora</h2>
           </div>
-          <div className="overflow-y-auto p-2">
-            {eficienciaData.length === 0 && !isLoading && (
-              <p className="text-slate-500 text-sm py-8 text-center">No hay registros en este periodo.</p>
-            )}
-            {eficienciaData.map((e, i) => (
-              <div key={`${e.id}-${e.fecha}-${i}`} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0">
-                <span className="font-medium text-slate-700">{e.nombres} {e.apellidos}</span>
-                <div className="text-right">
-                  <span className="block text-sm text-slate-500">{e.total_horas ?? 0}h trabajadas</span>
-                  <span className="block font-bold text-primary">${e.eficiencia?.toFixed(2) ?? '0.00'}/h</span>
+          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin">
+            {eficienciaData.length === 0 && !isLoading ? (
+               <div className="flex flex-col items-center justify-center h-full min-h-37.5 text-slate-400">
+                 <LayoutDashboard size={32} className="mb-2 opacity-50" />
+                 <p className="text-sm font-medium">Sin datos en este periodo</p>
+               </div>
+            ) : (
+              eficienciaData.map((e) => (
+                <div key={e.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0 group">
+                  <span className="font-medium text-slate-700 group-hover:text-primary transition-colors">{e.nombres} {e.apellidos}</span>
+                  <div className="text-right">
+                    <span className="block text-sm text-slate-500">{e.total_horas.toFixed(1)}h trabajadas</span>
+                    <span className="block font-bold text-primary">${e.eficiencia.toFixed(2)}/h</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* TABS DE MANTENIMIENTO */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 mb-8">
+        <div className="mb-5">
+          <h2 className="font-bold text-xl text-slate-800">Gestión Operativa</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Administra el historial de registros y los catálogos base del sistema.
+          </p>
+        </div>
+
         <Tabs defaultValue="historial" className="w-full">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-            <h2 className="font-bold text-xl text-slate-800">Gestión Operativa</h2>
-            <TabsList className="bg-slate-100 p-1 rounded-lg flex overflow-x-auto">
-              <TabsTrigger value="historial" className="rounded-md px-4 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Historial</TabsTrigger>
-              <TabsTrigger value="prendas" className="rounded-md px-4 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Prendas</TabsTrigger>
-              <TabsTrigger value="operaciones" className="rounded-md px-4 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Operaciones</TabsTrigger>
-              <TabsTrigger value="colores" className="rounded-md px-4 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Colores</TabsTrigger>
+          <div className="w-full mb-6">
+            <TabsList className="flex w-full overflow-x-auto scrollbar-hide bg-slate-100 p-1.5 rounded-xl gap-1 items-center justify-start">
+              
+              <TabsTrigger 
+                value="historial" 
+                className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                <History size={16} />
+                <span>Historial</span>
+              </TabsTrigger>
+              
+              <TabsTrigger 
+                value="prendas" 
+                className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                <Shirt size={16} />
+                <span>Prendas</span>
+              </TabsTrigger>
+              
+              <TabsTrigger 
+                value="operaciones" 
+                className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                <Scissors size={16} />
+                <span>Operaciones</span>
+              </TabsTrigger>
+              
+              <TabsTrigger 
+                value="colores" 
+                className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                <Palette size={16} />
+                <span>Colores</span>
+              </TabsTrigger>
+
             </TabsList>
           </div>
           
-          <TabsContent value="historial" className="outline-none"><HistorialGlobal /></TabsContent>
-          <TabsContent value="prendas" className="outline-none"><PrendasList /></TabsContent>
-          <TabsContent value="operaciones" className="outline-none"><OperacionesList /></TabsContent>
-          <TabsContent value="colores" className="outline-none"><ColoresList /></TabsContent>
+          <div className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded-lg">
+            <TabsContent value="historial" className="mt-0 outline-none"><HistorialGlobal /></TabsContent>
+            <TabsContent value="prendas" className="mt-0 outline-none"><PrendasList /></TabsContent>
+            <TabsContent value="operaciones" className="mt-0 outline-none"><OperacionesList /></TabsContent>
+            <TabsContent value="colores" className="mt-0 outline-none"><ColoresList /></TabsContent>
+          </div>
         </Tabs>
       </div>
+
     </div>
   )
 }
