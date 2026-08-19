@@ -1,20 +1,38 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 /**
- * Exporta un arreglo de objetos a un archivo Excel (.xlsx)
+ * Exporta un arreglo de objetos a un archivo Excel (.xlsx) de forma segura
  */
-export const exportToExcel = <T extends Record<string, unknown>>(data: T[], filename: string) => {
+export const exportToExcel = async <T extends Record<string, unknown>>(data: T[], filename: string) => {
   if (data.length === 0) return
 
-  // Convierte el JSON a una hoja de cálculo
-  const worksheet = XLSX.utils.json_to_sheet(data)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte')
-  
-  // Fuerza la descarga
-  XLSX.writeFile(workbook, `${filename}.xlsx`)
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet('Reporte')
+
+  // Extraer las cabeceras dinámicamente del primer objeto
+  const headers = Object.keys(data[0])
+  worksheet.columns = headers.map(header => ({
+    header: header.toUpperCase(),
+    key: header,
+    width: 20
+  }))
+
+  // Agregar filas
+  data.forEach(row => {
+    worksheet.addRow(row)
+  })
+
+  // Dar formato a la cabecera
+  worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+
+  // Generar y descargar el archivo
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  saveAs(blob, `${filename}.xlsx`)
 }
 
 /**
