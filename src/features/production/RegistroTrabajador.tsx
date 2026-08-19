@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Prenda, type Operacion, type Color } from '../../shared/lib/db' // <-- IMPORTAMOS LOS TIPOS
-import { supabase } from '../../shared/lib/supabase'
+import { db } from '../../shared/lib/db' 
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { toast } from 'sonner'
 import { CheckCircle2, Loader2, Tags, Hash } from 'lucide-react'
@@ -11,10 +10,11 @@ const TALLAS_DISPONIBLES = ['Única', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '3
 export default function RegistroTrabajador() {
   const { session } = useAuth()
   
-  const [prendas, setPrendas] = useState<Prenda[]>([])
-  const [operaciones, setOperaciones] = useState<Operacion[]>([])
-  const [colores, setColores] = useState<Color[]>([])
-  const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(true)
+  const prendas = useLiveQuery(() => db.prendas.toArray())
+  const operaciones = useLiveQuery(() => db.operaciones.toArray())
+  const colores = useLiveQuery(() => db.colores.toArray())
+
+  const isLoadingCatalogs = prendas === undefined || operaciones === undefined || colores === undefined
 
   const [prendaId, setPrendaId] = useState('')
   const [operacionId, setOperacionId] = useState('')
@@ -36,23 +36,6 @@ export default function RegistroTrabajador() {
     },
     [session]
   )
-
-  useEffect(() => {
-    const loadCatalogs = async () => {
-      const [pRes, oRes, cRes] = await Promise.all([
-        supabase.from('prendas').select('*').eq('activo', true),
-        supabase.from('operaciones').select('*').eq('activo', true),
-        supabase.from('colores').select('*').eq('activo', true)
-      ])
-      
-      if (pRes.data) setPrendas(pRes.data)
-      if (oRes.data) setOperaciones(oRes.data)
-      if (cRes.data) setColores(cRes.data)
-      
-      setIsLoadingCatalogs(false)
-    }
-    loadCatalogs()
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,14 +68,14 @@ export default function RegistroTrabajador() {
       setCantidad('')
     } catch (error) {
       console.error(error)
-      toast.error("Ocurrió un error al guardar")
+      toast.error("Ocurrió un error al guardar localmente")
     } finally {
       setIsSaving(false)
     }
   }
 
-  // Filtrar operaciones basadas en la prenda seleccionada
-  const operacionesFiltradas = operaciones.filter(o => String(o.prenda_id) === prendaId)
+  // Filtrar operaciones basadas en la prenda seleccionada (Usamos arreglos seguros)
+  const operacionesFiltradas = (operaciones || []).filter(o => String(o.prenda_id) === prendaId)
 
   if (isLoadingCatalogs) {
     return <div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-slate-400" size={32} /></div>
@@ -106,8 +89,7 @@ export default function RegistroTrabajador() {
       </div>
 
       {!turnoActivo && (
-        <div className="bg-amber-50 border border-amber-200 text-amber
-        -800 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
            <span className="text-xl">⚠️</span>
            <p>No tienes un turno iniciado. Ve a la pestaña de "Mis Turnos" para registrar tu hora de entrada antes de añadir producción.</p>
         </div>
@@ -129,7 +111,7 @@ export default function RegistroTrabajador() {
               required
             >
               <option value="" disabled>-- Elige una prenda --</option>
-              {prendas.map(p => (
+              {(prendas || []).map(p => (
                 <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
               ))}
             </select>
@@ -163,7 +145,7 @@ export default function RegistroTrabajador() {
               required
             >
               <option value="" disabled>-- Elige --</option>
-              {colores.map(c => (
+              {(colores || []).map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>

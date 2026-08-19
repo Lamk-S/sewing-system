@@ -7,8 +7,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
+      networkMode: 'offlineFirst',
+      retry: (failureCount) => {
+        if (!navigator.onLine) return false;
+        return failureCount < 3;
+      },
+      refetchOnWindowFocus: false, 
     },
   },
 })

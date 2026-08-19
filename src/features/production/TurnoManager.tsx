@@ -6,6 +6,7 @@ import { db } from '../../shared/lib/db'
 import { supabase } from '../../shared/lib/supabase'
 import { toast } from 'sonner'
 import { Clock, CheckCircle, StopCircle, Users } from 'lucide-react'
+import { useSyncCatalogs } from '../../shared/hooks/useSyncCatalogs'
 
 type TurnoConPerfil = {
   id: number;
@@ -19,6 +20,7 @@ type TurnoConPerfil = {
 export default function TurnoManager() {
   const { session, isAdmin } = useAuth()
   const [guardando, setGuardando] = useState(false)
+  const { triggerSync } = useSyncCatalogs()
 
   // ==========================================
   // LÓGICA DEL TRABAJADOR (OFFLINE/DEXIE)
@@ -118,27 +120,17 @@ export default function TurnoManager() {
       const fechaActual = new Date().toISOString().split('T')[0]
       const horaInicio = new Date().toISOString()
 
-      let isSynced = false
-      if (navigator.onLine) {
-        const { error } = await supabase.from('turnos').insert([{
-          local_id: localId,
-          trabajador_id: session.user.id,
-          fecha: fechaActual,
-          hora_inicio: horaInicio,
-          estado: 'abierto'
-        }])
-        if (!error) isSynced = true
-      }
-
       await db.turnos.add({
         local_id: localId,
         trabajador_id: session.user.id,
         fecha: fechaActual,
         hora_inicio: horaInicio,
         estado: 'abierto',
-        sync_status: isSynced ? 'synced' : 'pending' 
+        sync_status: 'pending' 
       })
-      toast.success(isSynced ? "Turno iniciado en la Nube" : "Turno iniciado (Modo Offline)")
+      
+      toast.success("Turno iniciado")
+      triggerSync()
     } catch (error) {
       console.error(error)
       toast.error("Error al iniciar turno")
@@ -148,32 +140,22 @@ export default function TurnoManager() {
   }
 
   const finalizarTurno = async () => {
-    if (!turnoActivo || !turnoActivo.local_id) return;
+    if (!turnoActivo || !turnoActivo.id) return;
     
     setGuardando(true)
     try {
       const horaFin = new Date().toISOString()
       const duracion = (new Date(horaFin).getTime() - new Date(turnoActivo.hora_inicio).getTime()) / 3600000
 
-      let isSynced = false
-      if (navigator.onLine) {
-        const { error } = await supabase.from('turnos')
-          .update({ hora_fin: horaFin, total_horas: duracion, estado: 'cerrado' })
-          .eq('local_id', turnoActivo.local_id)
-        
-        if (!error) isSynced = true
-      }
-
-      if (turnoActivo.id) {
-        await db.turnos.update(turnoActivo.id, {
-          hora_fin: horaFin,
-          total_horas: duracion,
-          estado: 'cerrado',
-          sync_status: isSynced ? 'synced' : 'pending' 
-        })
-      }
+      await db.turnos.update(turnoActivo.id, {
+        hora_fin: horaFin,
+        total_horas: duracion,
+        estado: 'cerrado',
+        sync_status: 'pending' 
+      })
       
       toast.success(`Turno finalizado: ${duracion.toFixed(2)} hrs`)
+      triggerSync()
     } catch (err) {
       console.error(err)
       toast.error("Error al cerrar turno")
