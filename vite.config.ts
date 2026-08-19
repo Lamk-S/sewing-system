@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Sistema de Confección LamkSew',
         short_name: 'LamkSew',
         description: 'Gestión de pagos a destajo y producción offline-first',
-        theme_color: '#2563eb',
-        background_color: '#f9fafb',
+        theme_color: '#1E3A5F',
+        background_color: '#F8FAFC',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
@@ -33,7 +33,28 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        navigateFallbackDenylist: [/^\/api/, /supabase\.co/]
+        navigateFallbackDenylist: [/^\/api/, /supabase\.co/],
+        maximumFileSizeToCacheInBytes: 5242880, 
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }, // 1 año
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gstatic-fonts-cache',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          }
+        ]
       }
     })
   ],
@@ -42,4 +63,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-db': ['@supabase/supabase-js', 'dexie', 'dexie-react-hooks'],
+          'vendor-exports': ['exceljs', 'jspdf', 'jspdf-autotable', 'file-saver'],
+          'vendor-ui': ['lucide-react', 'sonner']
+        }
+      }
+    }
+  }
 })
