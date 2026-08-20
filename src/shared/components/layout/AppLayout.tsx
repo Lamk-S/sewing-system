@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { LogOut, Home, Clock, History, BarChart3, Users, RefreshCw } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useSyncCatalogs } from '../../hooks/useSyncCatalogs'
+import Footer from '../Footer'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut, isAdmin } = useAuth()
@@ -23,7 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center py-4">
           
@@ -91,8 +92,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Margen para que el contenido no quede pegado al header */}
-      <main className="p-4 md:p-6 pb-20">{children}</main>
+      <main className="flex-1 p-4 md:p-6 pb-20">
+        {children}
+      </main>
+
+      <Footer />
     </div>
   )
 }
