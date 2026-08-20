@@ -119,9 +119,11 @@ export default function Dashboard() {
         
         {/* Resumen Diario */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <BarChart className="text-primary" size={20} />
-            <h3 className="font-semibold text-slate-800">Resumen Diario</h3>
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 rounded-md">
+               <BarChart className="text-primary" size={18} aria-hidden="true" />
+            </div>
+            <h3 className="font-bold text-slate-900">Resumen Diario</h3>
           </div>
           <div className="overflow-y-auto p-3 flex-1 scrollbar-thin">
             {diario.length === 0 ? (
@@ -144,9 +146,11 @@ export default function Dashboard() {
 
         {/* Tarifa Horaria */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <Clock className="text-amber-500" size={20} />
-            <h3 className="font-semibold text-slate-800">Tarifa Horaria Real</h3>
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 rounded-md">
+              <Clock className="text-primary" size={18} aria-hidden="true" />
+            </div>
+            <h3 className="font-bold text-slate-900">Tarifa Horaria Real</h3>
           </div>
           <div className="overflow-y-auto p-3 flex-1 scrollbar-thin">
             {tarifa.length === 0 ? (
@@ -169,9 +173,11 @@ export default function Dashboard() {
 
         {/* Resumen Semanal */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-100">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <DollarSign className="text-emerald-600" size={20} />
-            <h3 className="font-semibold text-slate-800">Resumen Semanal</h3>
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2.5">
+             <div className="p-1.5 bg-primary/10 rounded-md">
+               <DollarSign className="text-primary" size={18} aria-hidden="true" />
+             </div>
+            <h3 className="font-bold text-slate-900">Resumen Semanal</h3>
           </div>
           <div className="overflow-y-auto p-3 flex-1 scrollbar-thin">
             {semanal.length === 0 ? (

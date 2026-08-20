@@ -5,7 +5,7 @@ import { useAuth } from '../../shared/auth/AuthProvider'
 import { db } from '../../shared/lib/db'
 import { supabase } from '../../shared/lib/supabase'
 import { toast } from 'sonner'
-import { Clock, CheckCircle, StopCircle, Users } from 'lucide-react'
+import { Clock, PlayCircle, StopCircle, Users, Activity } from 'lucide-react'
 import { useSyncCatalogs } from '../../shared/hooks/useSyncCatalogs'
 
 type TurnoConPerfil = {
@@ -22,9 +22,7 @@ export default function TurnoManager() {
   const [guardando, setGuardando] = useState(false)
   const { triggerSync } = useSyncCatalogs()
 
-  // ==========================================
-  // LÓGICA DEL TRABAJADOR (OFFLINE/DEXIE)
-  // ==========================================
+  // --- LÓGICA LOCAL (TRABAJADOR) ---
   const turnoActivo = useLiveQuery(
     async () => {
       if (!session || isAdmin) return null;
@@ -37,9 +35,7 @@ export default function TurnoManager() {
     [session, isAdmin]
   )
 
-  // ==========================================
-  // LÓGICA DEL ADMINISTRADOR (ONLINE/SUPABASE)
-  // ==========================================
+  // --- LÓGICA ONLINE (ADMINISTRADOR) ---
   const { data: turnosGlobales, isLoading: loadingAdmin } = useQuery({
     queryKey: ['turnos-abiertos-admin'],
     queryFn: async () => {
@@ -58,47 +54,54 @@ export default function TurnoManager() {
 
   if (!session) return null
 
-  // VISTA 1: PANEL DE SUPERVISIÓN PARA ADMINISTRADOR
+  // ==========================================
+  // VISTA 1: PANEL ADMINISTRADOR
+  // ==========================================
   if (isAdmin) {
     return (
-      <div className="max-w-4xl mx-auto p-4 md:p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Users className="text-primary" size={28} />
+      <div className="max-w-4xl mx-auto p-4 md:p-6 mt-4">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200">
+          <div className="bg-primary/10 p-2 rounded-lg">
+            <Users className="text-primary" size={24} aria-hidden="true" />
+          </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Monitor de Taller</h2>
-            <p className="text-slate-500">Trabajadores con turno activo en este momento</p>
+            <h2 className="text-2xl font-bold text-slate-900">Monitor de Taller</h2>
+            <p className="text-slate-600 text-sm mt-0.5">Operarios con turno activo en tiempo real.</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {loadingAdmin ? (
-             <div className="p-12 flex justify-center"><Clock className="animate-spin text-slate-400" size={32} /></div>
+            <div className="p-12 flex flex-col items-center justify-center text-slate-500">
+              <Clock className="animate-spin text-slate-400 mb-3" size={32} />
+              <span className="text-sm font-medium">Buscando operarios activos...</span>
+            </div>
           ) : turnosGlobales?.length === 0 ? (
             <div className="p-16 text-center text-slate-500 bg-slate-50">
-              <Clock size={48} className="mx-auto mb-4 text-slate-300" strokeWidth={1.5} />
+              <Activity size={48} className="mx-auto mb-4 text-slate-300" strokeWidth={1.5} />
               <p className="text-lg font-medium text-slate-700">El taller está vacío</p>
-              <p className="text-sm">No hay trabajadores con turnos abiertos en este instante.</p>
+              <p className="text-sm mt-1">No hay trabajadores registrados en línea actualmente.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {turnosGlobales?.map((turno) => (
-                <div key={turno.id} className="p-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-slate-50 transition-colors">
+                <div key={turno.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 text-primary rounded-full flex justify-center items-center font-bold text-lg border border-blue-100 shadow-sm">
+                    <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex justify-center items-center font-bold text-lg border border-slate-200 shadow-sm" aria-hidden="true">
                       {turno.perfiles?.nombres?.charAt(0)}{turno.perfiles?.apellidos?.charAt(0)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">
+                      <h3 className="font-bold text-slate-900 text-lg">
                         {turno.perfiles?.nombres} {turno.perfiles?.apellidos}
                       </h3>
-                      <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
-                        <Clock size={14} /> 
-                        Inició: {new Date(turno.hora_inicio).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                        <Clock size={14} className="text-slate-400" /> 
+                        Entrada: {new Date(turno.hora_inicio).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </p>
                     </div>
                   </div>
-                  <span className="px-4 py-1.5 bg-emerald-50 text-emerald-700 font-semibold rounded-full text-sm border border-emerald-200 flex items-center gap-2 self-start sm:self-auto">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 font-semibold rounded-md text-sm border border-emerald-200 flex items-center gap-2 self-start sm:self-auto shadow-sm">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" aria-hidden="true" />
                     En línea
                   </span>
                 </div>
@@ -110,9 +113,9 @@ export default function TurnoManager() {
     )
   }
 
-  // VISTA 2: PANEL DE OPERACIÓN PARA TRABAJADOR
-  if (turnoActivo === undefined) return <div className="flex justify-center items-center py-20"><Clock className="animate-spin text-slate-400" size={32} /></div>
-
+  // ==========================================
+  // VISTA 2: PANEL TRABAJADOR
+  // ==========================================
   const iniciarTurno = async () => {
     setGuardando(true)
     try {
@@ -129,11 +132,11 @@ export default function TurnoManager() {
         sync_status: 'pending' 
       })
       
-      toast.success("Turno iniciado")
+      toast.success("Turno iniciado exitosamente")
       triggerSync()
     } catch (error) {
       console.error(error)
-      toast.error("Error al iniciar turno")
+      toast.error("Error al iniciar turno en el dispositivo")
     } finally {
       setGuardando(false)
     }
@@ -154,7 +157,7 @@ export default function TurnoManager() {
         sync_status: 'pending' 
       })
       
-      toast.success(`Turno finalizado: ${duracion.toFixed(2)} hrs`)
+      toast.success(`Turno cerrado. Tiempo: ${duracion.toFixed(2)} hrs`)
       triggerSync()
     } catch (err) {
       console.error(err)
@@ -164,50 +167,60 @@ export default function TurnoManager() {
     }
   }
 
+  if (turnoActivo === undefined) {
+    return (
+      <div className="flex justify-center items-center py-20 text-slate-500">
+        <Clock className="animate-spin text-slate-400" size={32} />
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-md mx-auto p-5 bg-white rounded-2xl shadow-sm mt-6 md:mt-10 border border-slate-200">
+    <div className="max-w-md mx-auto p-6 md:p-8 bg-white rounded-xl shadow-sm mt-8 border border-slate-200">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-slate-800">Control de Asistencia</h2>
-        <p className="text-sm text-slate-500 mt-1">Registra tus horas de entrada y salida</p>
+        <h2 className="text-2xl font-bold text-slate-900">Control de Asistencia</h2>
+        <p className="text-sm text-slate-600 mt-1.5">Registra estrictamente tu entrada y salida.</p>
       </div>
 
-      <div className={`p-5 rounded-xl mb-8 border transition-colors ${
-        turnoActivo ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-200"
-      }`}>
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <Clock size={28} className={turnoActivo ? "text-emerald-600" : "text-slate-400"} />
-          <span className={`text-xl font-bold ${turnoActivo ? "text-emerald-700" : "text-slate-600"}`}>
+      <div 
+        className={`p-6 rounded-lg mb-8 border transition-all ${
+          turnoActivo 
+            ? "bg-emerald-50 border-emerald-200 shadow-inner" 
+            : "bg-slate-50 border-slate-200"
+        }`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <Clock size={28} className={turnoActivo ? "text-emerald-600" : "text-slate-400"} aria-hidden="true" />
+          <span className={`text-xl font-bold tracking-tight ${turnoActivo ? "text-emerald-800" : "text-slate-700"}`}>
             {turnoActivo ? "Estás en Turno" : "Fuera de Turno"}
           </span>
         </div>
-        {turnoActivo ? (
-           <p className="text-sm text-emerald-600 font-medium text-center">
-             Tus operaciones de hoy calcularán tu tarifa horaria.
-           </p>
-        ) : (
-           <p className="text-sm text-slate-500 text-center">
-             Inicia tu turno antes de registrar producción.
-           </p>
-        )}
+        <p className={`text-sm text-center font-medium ${turnoActivo ? "text-emerald-700" : "text-slate-500"}`}>
+          {turnoActivo 
+            ? "Tus operaciones registradas hoy contarán para tu pago." 
+            : "Inicia tu turno antes de comenzar la producción."}
+        </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {!turnoActivo ? (
           <button 
             onClick={iniciarTurno} 
             disabled={guardando} 
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl flex justify-center items-center transition-all disabled:opacity-50 active:scale-[0.98] shadow-sm"
+            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-md flex justify-center items-center transition-colors disabled:opacity-50 active:scale-[0.98] shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
           >
-            {guardando ? <Clock className="animate-spin mr-2" size={20} /> : <CheckCircle className="mr-2" size={20} />}
-            {guardando ? 'Procesando...' : 'Iniciar Turno'}
+            {guardando ? <Clock className="animate-spin mr-2" size={20} /> : <PlayCircle className="mr-2" size={20} />}
+            {guardando ? 'Procesando...' : 'Iniciar Turno Ahora'}
           </button>
         ) : (
           <button 
             onClick={finalizarTurno} 
             disabled={guardando} 
-            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl flex justify-center items-center transition-all disabled:opacity-50 active:scale-[0.98] shadow-sm"
+            className="w-full bg-white text-slate-900 hover:bg-slate-50 border-2 border-slate-200 font-bold py-4 rounded-md flex justify-center items-center transition-colors disabled:opacity-50 active:scale-[0.98] shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900"
           >
-            {guardando ? <Clock className="animate-spin mr-2" size={20} /> : <StopCircle className="mr-2" size={20} />}
+            {guardando ? <Clock className="animate-spin mr-2 text-slate-500" size={20} /> : <StopCircle className="mr-2 text-slate-500" size={20} />}
             {guardando ? 'Procesando...' : 'Finalizar Turno de Hoy'}
           </button>
         )}
