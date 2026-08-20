@@ -139,60 +139,65 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl animate-in fade-in duration-300">
+    <div className="container mx-auto max-w-7xl px-4 md:px-6 py-6 md:py-8 animate-in fade-in duration-300">
       
       {/* HEADER */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-2">
-          <LayoutDashboard className="text-primary" size={28} aria-hidden="true" />
+      <div className="mb-8 border-b border-slate-200 pb-5">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-3">
+          <div className="bg-primary/10 p-2 rounded-lg">
+            <LayoutDashboard className="text-primary" size={24} aria-hidden="true" />
+          </div>
           Panel de Administración
         </h1>
-        <p className="text-sm md:text-base text-slate-500 mt-1">
+        <p className="text-sm md:text-base text-slate-600 mt-2">
           Supervisión de producción, eficiencia y gestión de catálogos.
         </p>
       </div>
 
       {/* CONTROLES: FILTROS Y EXPORTACIÓN */}
-      <div className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col lg:flex-row gap-5 justify-between items-start lg:items-center">
+      <div className="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-200 mb-8 flex flex-col lg:flex-row gap-5 justify-between items-start lg:items-center">
         
         <div className="flex flex-col md:flex-row flex-wrap items-start md:items-center gap-4 w-full lg:w-auto">
           {/* Inputs de Fecha */}
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <CalendarIcon className="text-slate-400 hidden sm:block shrink-0" size={20} aria-hidden="true" />
-            <input 
-              type="date" 
-              aria-label="Fecha de inicio"
-              value={fromDate} 
-              onChange={(e) => setFromDate(e.target.value)} 
-              className="flex-1 md:w-30 border border-slate-300 text-sm p-2.5 md:p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
-            <span className="text-slate-400 text-sm font-medium">a</span>
-            <input 
-              type="date" 
-              aria-label="Fecha de fin"
-              value={toDate} 
-              onChange={(e) => setToDate(e.target.value)} 
-              className="flex-1 md:w-30 border border-slate-300 text-sm p-2.5 md:p-2 rounded-lg text-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
+            <CalendarIcon className="text-slate-500 hidden sm:block shrink-0" size={20} aria-hidden="true" />
+            
+            {/* Contenedor Grid para móviles, Flex para desktop */}
+            <div className="grid grid-cols-[1fr_auto_1fr] sm:flex items-center gap-2 w-full sm:w-auto">
+              <input 
+                type="date" 
+                aria-label="Fecha de inicio"
+                value={fromDate} 
+                onChange={(e) => setFromDate(e.target.value)} 
+                className="w-full sm:w-32 md:w-36 min-w-0 border border-slate-300 text-sm p-2 rounded-md text-slate-900 bg-white focus:ring-2 focus:ring-primary outline-none transition-shadow shadow-sm"
+              />
+              <span className="text-slate-400 text-sm font-medium shrink-0">a</span>
+              <input 
+                type="date" 
+                aria-label="Fecha de fin"
+                value={toDate} 
+                onChange={(e) => setToDate(e.target.value)} 
+                className="w-full sm:w-32 md:w-36 min-w-0 border border-slate-300 text-sm p-2 rounded-md text-slate-900 bg-white focus:ring-2 focus:ring-primary outline-none transition-shadow shadow-sm"
+              />
+            </div>
           </div>
           
           {/* Botones de Rango Rápido */}
-          <div className="flex gap-2 w-full md:w-auto md:border-l md:border-slate-200 md:pl-4">
-            <button onClick={setHoy} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Hoy</button>
-            <button onClick={setSemana} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Semana</button>
-            <button onClick={setMes} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">Mes</button>
+          <div className="grid grid-cols-3 sm:flex gap-2 w-full md:w-auto md:border-l md:border-slate-300 md:pl-4">
+            <button onClick={setHoy} className="w-full sm:w-auto px-4 py-2 text-sm font-semibold border border-slate-300 rounded-md text-slate-700 bg-white hover:bg-slate-100 transition-colors shadow-sm">Hoy</button>
+            <button onClick={setSemana} className="w-full sm:w-auto px-4 py-2 text-sm font-semibold border border-slate-300 rounded-md text-slate-700 bg-white hover:bg-slate-100 transition-colors shadow-sm">Semana</button>
+            <button onClick={setMes} className="w-full sm:w-auto px-4 py-2 text-sm font-semibold border border-slate-300 rounded-md text-slate-700 bg-white hover:bg-slate-100 transition-colors shadow-sm">Mes</button>
           </div>
         </div>
         
         {/* Exportación */}
-        <div className="flex gap-3 w-full lg:w-auto pt-4 lg:pt-0 border-t border-slate-100 lg:border-0">
+        <div className="flex gap-3 w-full lg:w-auto pt-4 lg:pt-0 border-t border-slate-200 lg:border-0">
           <button
             onClick={() => exportToExcel(rankingData, `Ranking_${new Date().toISOString().split('T')[0]}`)}
             disabled={rankingData.length === 0 || isLoading}
-            aria-label="Exportar a Excel"
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2.5 md:py-2 rounded-lg font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-50 text-sm focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm"
           >
-            <FileSpreadsheet size={18} />
+            <FileSpreadsheet size={18} className="text-slate-500" />
             <span>Excel</span>
           </button>
           <button
@@ -208,10 +213,9 @@ export default function AdminDashboard() {
               `Reporte de Producción (Destajo)`
             )}
             disabled={rankingData.length === 0 || isLoading}
-            aria-label="Exportar a PDF"
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200 px-4 py-2.5 md:py-2 rounded-lg font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 text-sm focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm"
           >
-            <FileText size={18} />
+            <FileText size={18} className="text-slate-500" />
             <span>PDF</span>
           </button>
         </div>
@@ -219,11 +223,11 @@ export default function AdminDashboard() {
 
       {/* ESTADO DE ERROR */}
       {isError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800">
-          <AlertCircle className="shrink-0 mt-0.5" size={20} />
+        <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-800 shadow-sm">
+          <AlertCircle className="shrink-0 mt-0.5" size={20} aria-hidden="true" />
           <div>
             <h3 className="font-semibold text-sm">Error de conexión</h3>
-            <p className="text-sm opacity-90">No pudimos cargar los datos. Verifica tu conexión o intenta recargar la página.</p>
+            <p className="text-sm opacity-90 mt-1">No pudimos cargar los datos. Verifica tu conexión o intenta recargar la página.</p>
           </div>
         </div>
       )}

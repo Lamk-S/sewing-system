@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../shared/lib/db' 
 import { useAuth } from '../../shared/auth/AuthProvider'
 import { toast } from 'sonner'
-import { CheckCircle2, Loader2, Tags, Hash } from 'lucide-react'
+import { CheckCircle2, Loader2, Tags, Hash, AlertTriangle } from 'lucide-react'
 
-const TALLAS_DISPONIBLES = ['Única', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34']
+const TALLAS_DISPONIBLES = ['Única', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
 
 export default function RegistroTrabajador() {
   const { session } = useAuth()
   
+  // Lectura Offline-First garantizada
   const prendas = useLiveQuery(() => db.prendas.toArray())
   const operaciones = useLiveQuery(() => db.operaciones.toArray())
   const colores = useLiveQuery(() => db.colores.toArray())
@@ -25,7 +26,6 @@ export default function RegistroTrabajador() {
   
   const [isSaving, setIsSaving] = useState(false)
 
-  // Verificar si hay un turno abierto
   const turnoActivo = useLiveQuery(
     async () => {
       if (!session) return null;
@@ -37,15 +37,21 @@ export default function RegistroTrabajador() {
     [session]
   )
 
+  // Rendimiento: Evitamos recalcular el filtro en cada re-render (tecleo en inputs)
+  const operacionesFiltradas = useMemo(() => {
+    if (!operaciones || !prendaId) return []
+    return operaciones.filter(o => String(o.prenda_id) === prendaId)
+  }, [operaciones, prendaId])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!session || !turnoActivo) {
-      toast.error("Debes iniciar tu turno primero en la pestaña 'Mis Turnos'.")
+      toast.error("Inicia tu turno para poder registrar.")
       return
     }
 
     if (Number(cantidad) <= 0) {
-      toast.error("La cantidad debe ser mayor a 0")
+      toast.error("La cantidad debe ser mayor a 0.")
       return
     }
 
@@ -64,53 +70,67 @@ export default function RegistroTrabajador() {
         created_at: new Date().toISOString()
       })
 
-      toast.success("Producción registrada correctamente")
-      setCantidad('')
+      toast.success("Bulto registrado exitosamente", {
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      })
+      setCantidad('') // Reset rápido para el siguiente bulto
     } catch (error) {
       console.error(error)
-      toast.error("Ocurrió un error al guardar localmente")
+      toast.error("Error al guardar localmente")
     } finally {
       setIsSaving(false)
     }
   }
 
-  // Filtrar operaciones basadas en la prenda seleccionada (Usamos arreglos seguros)
-  const operacionesFiltradas = (operaciones || []).filter(o => String(o.prenda_id) === prendaId)
-
   if (isLoadingCatalogs) {
-    return <div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-slate-400" size={32} /></div>
+    return (
+      <div className="flex flex-col justify-center items-center py-20 text-slate-500">
+        <Loader2 className="animate-spin mb-3 text-slate-400" size={32} />
+        <span className="text-sm font-medium text-slate-600">Cargando catálogos...</span>
+      </div>
+    )
   }
 
   return (
-    <div className="max-w-lg mx-auto bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-slate-200 mt-4 animate-in fade-in duration-300">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Registrar Producción</h2>
-        <p className="text-slate-500 text-sm">Añade las piezas completadas a tu registro diario.</p>
+    <div className="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 mt-4 md:mt-8">
+      <div className="mb-6 border-b border-slate-100 pb-4">
+        <h2 className="text-2xl font-bold text-slate-900">Registro de Producción</h2>
+        <p className="text-slate-600 text-sm mt-1">Declara las piezas completadas en tu turno actual.</p>
       </div>
 
       {!turnoActivo && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
-           <span className="text-xl">⚠️</span>
-           <p>No tienes un turno iniciado. Ve a la pestaña de "Mis Turnos" para registrar tu hora de entrada antes de añadir producción.</p>
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 flex gap-3 items-start" role="alert">
+           <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} aria-hidden="true" />
+           <div>
+             <h3 className="text-amber-800 font-semibold text-sm">Turno no iniciado</h3>
+             <p className="text-amber-700 text-sm mt-1">Ve a la pestaña "Mis Turnos" para registrar tu entrada antes de comenzar a producir.</p>
+           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className={`space-y-5 ${!turnoActivo ? 'opacity-50 pointer-events-none' : ''}`}>
+      <form 
+        onSubmit={handleSubmit} 
+        className={`space-y-6 ${!turnoActivo ? 'opacity-50 pointer-events-none' : ''}`}
+        aria-disabled={!turnoActivo}
+      >
         
-        {/* Fila 1: Prenda y Operación */}
-        <div className="space-y-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        {/* Fila 1: Catálogos Principales */}
+        <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">1. Selecciona la Prenda</label>
+            <label htmlFor="prendaSelect" className="block text-sm font-semibold text-slate-900 mb-1.5">
+              1. Prenda a trabajar
+            </label>
             <select
+              id="prendaSelect"
               value={prendaId}
               onChange={(e) => {
                 setPrendaId(e.target.value)
-                setOperacionId('')
+                setOperacionId('') // Reset dependencia
               }}
-              className="w-full p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
               required
             >
-              <option value="" disabled>-- Elige una prenda --</option>
+              <option value="" disabled>-- Selecciona la prenda --</option>
               {(prendas || []).map(p => (
                 <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
               ))}
@@ -118,15 +138,19 @@ export default function RegistroTrabajador() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Operación Realizada</label>
+            <label htmlFor="operacionSelect" className="block text-sm font-semibold text-slate-900 mb-1.5">
+              2. Operación realizada
+            </label>
             <select
+              id="operacionSelect"
               value={operacionId}
               onChange={(e) => setOperacionId(e.target.value)}
-              className="w-full p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:bg-slate-100"
+              className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
               required
               disabled={!prendaId}
+              aria-disabled={!prendaId}
             >
-              <option value="" disabled>-- Elige la operación --</option>
+              <option value="" disabled>-- Selecciona la operación --</option>
               {operacionesFiltradas.map(o => (
                 <option key={o.id} value={o.id}>{o.nombre} - ${o.precio_fijo.toFixed(2)}</option>
               ))}
@@ -134,31 +158,36 @@ export default function RegistroTrabajador() {
           </div>
         </div>
 
-        {/* Fila 2: Talla, Color y Lote (Variantes) */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Color</label>
+        {/* Fila 2: Variantes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label htmlFor="colorSelect" className="block text-sm font-semibold text-slate-900 mb-1.5">
+              Color
+            </label>
             <select
+              id="colorSelect"
               value={colorId}
               onChange={(e) => setColorId(e.target.value)}
-              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
               required
             >
-              <option value="" disabled>-- Elige --</option>
+              <option value="" disabled>-- Selecciona color --</option>
               {(colores || []).map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 mb-1.5">
-              <Tags size={14} className="text-slate-400" /> Talla
+          <div>
+            <label htmlFor="tallaSelect" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1.5">
+              <Tags size={14} className="text-slate-500" aria-hidden="true" /> 
+              Talla
             </label>
             <select
+              id="tallaSelect"
               value={talla}
               onChange={(e) => setTalla(e.target.value)}
-              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
               required
             >
               {TALLAS_DISPONIBLES.map(t => (
@@ -167,38 +196,42 @@ export default function RegistroTrabajador() {
             </select>
           </div>
 
-          <div className="col-span-2">
-             <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 mb-1.5">
-              <Hash size={14} className="text-slate-400" /> Lote / OP (Opcional)
+          <div className="sm:col-span-2">
+             <label htmlFor="loteInput" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1.5">
+              <Hash size={14} className="text-slate-500" aria-hidden="true" /> 
+              Lote / OP <span className="text-slate-400 font-normal">(Opcional)</span>
             </label>
             <input
+              id="loteInput"
               type="text"
               value={lote}
               onChange={(e) => setLote(e.target.value)}
               placeholder="Ej. OP-1042"
-              className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all uppercase"
+              className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 uppercase shadow-sm"
             />
-            <p className="text-xs text-slate-500 mt-1">Identificador del corte o bloque de producción.</p>
           </div>
         </div>
 
-        {/* Fila 3: Cantidad y Botón */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cantidad de Piezas</label>
-          <div className="flex gap-3">
+        {/* Fila 3: Cantidad y Submit */}
+        <div className="pt-4 border-t border-slate-100">
+          <label htmlFor="cantidadInput" className="block text-sm font-semibold text-slate-900 mb-2">
+            3. Cantidad final del bulto
+          </label>
+          <div className="flex flex-col sm:flex-row gap-4">
             <input
+              id="cantidadInput"
               type="number"
               min="1"
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
-              className="w-32 p-3 text-center text-lg font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+              className="w-full sm:w-32 min-h-12 p-3 text-center text-xl font-bold bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
               placeholder="0"
               required
             />
             <button
               type="submit"
               disabled={isSaving || !turnoActivo}
-              className="flex-1 bg-primary text-primary-foreground font-bold p-3 rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 flex justify-center items-center gap-2 active:scale-[0.98] shadow-sm"
+              className="flex-1 min-h-12 bg-primary text-white font-bold p-3 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex justify-center items-center gap-2 active:scale-[0.98] shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
             >
               {isSaving ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
               {isSaving ? 'Guardando...' : 'Registrar Bulto'}
