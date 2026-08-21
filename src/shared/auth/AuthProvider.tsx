@@ -1,94 +1,100 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import type { Session } from '@supabase/supabase-js'
+import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { SplashScreen } from '../components/ui/SplashScreen'
 
 type AuthContextType = {
   session: Session | null
   isAdmin: boolean
+  isAuthLoading: boolean
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   isAdmin: false,
+  isAuthLoading: true,
   signOut: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  
-  const [isAdmin, setIsAdmin] = useState(() => {
-    return localStorage.getItem('lamksew_isAdmin') === 'true'
-  })
-  
-  const [loading, setLoading] = useState(true)
-  const [splashTimerFinished, setSplashTimerFinished] = useState(false)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSplashTimerFinished(true)
-    }, 1200)
+    let mounted = true;
 
-    const fetchRole = async (userId: string) => {
-      if (!navigator.onLine) return;
+    const fetchAndCacheRole = async (user: User) => {
+      const cacheKey = `lamksew_role_${user.id}`;
+      
+      if (!navigator.onLine) {
+        return localStorage.getItem(cacheKey) === 'admin';
+      }
 
       try {
         const { data, error } = await supabase
           .from('perfiles')
           .select('rol')
-          .eq('id', userId)
-          .single()
+          .eq('id', user.id)
+          .single();
 
         if (!error && data) {
-          const isUserAdmin = data.rol === 'admin'
-          setIsAdmin(isUserAdmin)
-          localStorage.setItem('lamksew_isAdmin', String(isUserAdmin))
+          const isUserAdmin = data.rol === 'admin';
+          localStorage.setItem(cacheKey, String(isUserAdmin));
+          return isUserAdmin;
         }
       } catch (err) {
-        console.error('Error al obtener el rol del usuario', err)
+        console.error('Error fetching role:', err);
       }
+
+      return localStorage.getItem(cacheKey) === 'admin';
     }
 
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-
-      if (session) {
-        await fetchRole(session.user.id)
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          setSession(currentSession);
+          if (currentSession) {
+            const adminStatus = await fetchAndCacheRole(currentSession.user);
+            setIsAdmin(adminStatus);
+          }
+        }
+      } finally {
+        if (mounted) setIsAuthLoading(false);
       }
-      setLoading(false)
     }
 
-    initAuth()
+    initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session)
-      if (session) {
-        await fetchRole(session.user.id)
-      } else {
-        setIsAdmin(false)
-        localStorage.removeItem('lamksew_isAdmin')
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!mounted) return;
+
+      setSession(newSession);
+
+      if (event === 'SIGNED_OUT') {
+        setIsAdmin(false);
+      } else if (newSession && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        if (event === 'SIGNED_IN') setIsAuthLoading(true); 
+        const adminStatus = await fetchAndCacheRole(newSession.user);
+        setIsAdmin(adminStatus);
+        if (event === 'SIGNED_IN') setIsAuthLoading(false);
       }
-    })
+    });
 
     return () => {
-      clearTimeout(timer)
-      subscription.unsubscribe()
+      mounted = false;
+      subscription.unsubscribe();
     }
   }, [])
 
   const signOut = async () => {
-    localStorage.removeItem('lamksew_isAdmin')
-    await supabase.auth.signOut()
-  }
-
-  if (loading || !splashTimerFinished) {
-    return <SplashScreen message="Cargando entorno de trabajo..." />
+    await supabase.auth.signOut();
   }
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ session, isAdmin, isAuthLoading, signOut }}>
       {children}
     </AuthContext.Provider>
   )
