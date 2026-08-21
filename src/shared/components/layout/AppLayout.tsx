@@ -1,12 +1,12 @@
 import { useAuth } from '../../auth/AuthProvider'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, Outlet } from 'react-router-dom'
 import { Button } from '../ui/button'
 import { LogOut, Home, Clock, History, BarChart3, Users, RefreshCw } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useSyncCatalogs } from '../../hooks/useSyncCatalogs'
 import Footer from '../Footer'
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout() {
   const { signOut, isAdmin } = useAuth()
   const location = useLocation()
   const { isSyncing } = useSyncCatalogs()
@@ -93,7 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex-1 p-4 md:p-6 pb-20">
-        {children}
+        <Outlet />
       </main>
 
       <Footer />
