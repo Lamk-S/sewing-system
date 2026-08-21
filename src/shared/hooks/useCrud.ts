@@ -1,120 +1,97 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
-import { toast } from 'sonner';
-import type { Database } from '../../types/supabase';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
+import type { Database } from '../../types/supabase'
+import { toast } from 'sonner'
 
-type CatalogTable = 'prendas' | 'operaciones' | 'colores';
+type TableName = keyof Database['public']['Tables']
 
-export function useCrud<T extends CatalogTable>(tableName: T) {
-  const queryClient = useQueryClient();
-  const queryKey = [tableName];
+export function useCrud<T extends TableName>(tableName: T) {
+  const queryClient = useQueryClient()
+  
+  type Row = Database['public']['Tables'][T]['Row']
+  type InsertDto = Database['public']['Tables'][T]['Insert']
+  type UpdateDto = Database['public']['Tables'][T]['Update']
 
-  type Row = Database['public']['Tables'][T]['Row'];
-  type Insert = Database['public']['Tables'][T]['Insert'];
-  type Update = Database['public']['Tables'][T]['Update'];
-
-  const { data, isLoading, error, refetch } = useQuery<Row[]>({
-    queryKey,
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [tableName],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('*')
-        .order('id', { ascending: true });
-        
-      if (error) throw new Error(error.message);
-      return data as unknown as Row[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await supabase.from(tableName as any).select('*').order('id', { ascending: false })
+      if (error) throw error
+      return data as unknown as Row[]
     },
-    staleTime: 1000 * 60 * 5,
-  });
+    staleTime: 1000 * 60 * 2
+  })
 
-  const createRecord = useMutation({
-    mutationFn: async (newItem: Insert) => {
+  const addMutation = useMutation({
+    mutationFn: async (newItem: InsertDto) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await supabase.from(tableName as any).insert(newItem).select().single()
+      if (error) throw error
+      return data as unknown as Row
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [tableName] })
+      toast.success('Registro añadido exitosamente')
+    },
+    onError: (err) => {
+      console.error(err)
+      toast.error('Error al guardar el registro')
+    }
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number | string; updates: UpdateDto }) => {
       const { data, error } = await supabase
-        .from(tableName)
-        .insert(newItem as never)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from(tableName as any)
+        .update(updates)
+        .eq('id', id)
         .select()
-        .single();
-        
-      if (error) throw new Error(error.message);
-      return data as unknown as Row;
-    },
-    onMutate: async (newItem) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previousData = queryClient.getQueryData<Row[]>(queryKey);
-      const optimisticItem = { ...newItem, id: -Math.random() } as unknown as Row;
-      queryClient.setQueryData<Row[]>(queryKey, (old) => [...(old || []), optimisticItem]);
-      return { previousData };
-    },
-    onError: (err, _, context) => {
-      queryClient.setQueryData(queryKey, context?.previousData);
-      toast.error(`Error al crear: ${err.message}`);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
+        .single()
 
-  const updateRecord = useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Update }) => {
-      const { data, error } = await supabase
-        .from(tableName)
-        .update(updates as never)
-        .eq('id' as never, id)
-        .select()
-        .single();
-        
-      if (error) throw new Error(error.message);
-      return data as unknown as Row;
+      if (error) throw error
+      return data as unknown as Row
     },
-    onMutate: async ({ id, updates }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previousData = queryClient.getQueryData<Row[]>(queryKey);
-      queryClient.setQueryData<Row[]>(queryKey, (old) => 
-        old?.map(item => item.id === id ? { ...item, ...updates } : item) as Row[]
-      );
-      return { previousData };
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [tableName] })
+      toast.success('Registro actualizado')
     },
-    onError: (err, _, context) => {
-      queryClient.setQueryData(queryKey, context?.previousData);
-      toast.error(`Error al actualizar: ${err.message}`);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
+    onError: (err) => {
+      console.error(err)
+      toast.error('Error al actualizar')
+    }
+  })
 
-  const deleteRecord = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id' as never, id);
-        
-      if (error) throw new Error(error.message);
-      return id;
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number | string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from(tableName as any).delete().eq('id', id)
+      if (error) throw error
+      return id
     },
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previousData = queryClient.getQueryData<Row[]>(queryKey);
-      queryClient.setQueryData<Row[]>(queryKey, (old) => old?.filter(item => item.id !== id));
-      return { previousData };
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [tableName] })
+      toast.success('Registro eliminado')
     },
-    onError: (err, _, context) => {
-      queryClient.setQueryData(queryKey, context?.previousData);
-      toast.error(`Error al eliminar: ${err.message}`);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
+    onError: (err) => {
+      console.error(err)
+      toast.error('Error al eliminar (puede que esté en uso)')
+    }
+  })
 
   return {
-    data: data || [],
+    data: data ?? [],
     isLoading,
     error,
     refetch,
-    create: createRecord.mutateAsync,
-    update: updateRecord.mutateAsync,
-    remove: deleteRecord.mutateAsync,
-  };
+    create: addMutation.mutate,
+    add: addMutation.mutate,
+    update: updateMutation.mutate,
+    remove: deleteMutation.mutate,
+    isCreating: addMutation.isPending,
+    isAdding: addMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+  }
 }

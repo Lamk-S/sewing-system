@@ -1,113 +1,121 @@
-import { useCallback, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { db } from '../lib/db';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useState } from 'react'
+import { db } from '../lib/db'
+import { supabase } from '../lib/supabase'
+import { toast } from 'sonner'
+
+let isSyncingGlobal = false;
 
 export function useSyncCatalogs() {
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(isSyncingGlobal)
 
-  const syncCatalogsDown = useCallback(async () => {
-    if (!navigator.onLine) return;
+  const triggerSync = useCallback(async (silent = false) => {
+    if (!navigator.onLine || isSyncingGlobal) return;
+
+    isSyncingGlobal = true;
+    setIsSyncing(true);
 
     try {
-      const [prendasRes, operacionesRes, coloresRes] = await Promise.all([
-        supabase.from('prendas').select('*').eq('activo', true),
-        supabase.from('operaciones').select('*').eq('activo', true),
-        supabase.from('colores').select('*').eq('activo', true),
+      // ===============================================
+      // 1. SYNC UP (Subir producción y turnos locales)
+      // ===============================================
+      const [registrosPendientes, turnosPendientes] = await Promise.all([
+        db.registros_produccion.where('sync_status').equals('pending').toArray(),
+        db.turnos.where('sync_status').equals('pending').toArray()
       ]);
 
-      if (prendasRes.error) throw prendasRes.error;
-      if (operacionesRes.error) throw operacionesRes.error;
-      if (coloresRes.error) throw coloresRes.error;
+      let itemsSubidos = 0;
+
+      if (registrosPendientes.length > 0) {
+        const payloadReg = registrosPendientes.map(r => ({
+          cantidad: r.cantidad,
+          color_id: r.color_id,
+          fecha_trabajo: r.fecha_trabajo,
+          local_id: r.local_id,
+          lote: r.lote,
+          operacion_id: r.operacion_id,
+          talla: r.talla,
+          trabajador_id: r.trabajador_id,
+        }));
+
+        const { error: errReg } = await supabase
+          .from('registros_produccion')
+          .upsert(payloadReg, { onConflict: 'local_id' });
+
+        if (!errReg) {
+          await db.registros_produccion.bulkUpdate(
+            registrosPendientes.map(r => ({ key: r.id!, changes: { sync_status: 'synced' as const } }))
+          );
+          itemsSubidos += registrosPendientes.length;
+        }
+      }
+
+      if (turnosPendientes.length > 0) {
+        const payloadTurnos = turnosPendientes.map(t => ({
+          estado: t.estado,
+          fecha: t.fecha,
+          hora_fin: t.hora_fin,
+          hora_inicio: t.hora_inicio,
+          local_id: t.local_id,
+          total_horas: t.total_horas,
+          trabajador_id: t.trabajador_id,
+        }));
+
+        const { error: errTurnos } = await supabase
+          .from('turnos')
+          .upsert(payloadTurnos, { onConflict: 'local_id' });
+
+        if (!errTurnos) {
+          await db.turnos.bulkUpdate(
+            turnosPendientes.map(t => ({ key: t.id!, changes: { sync_status: 'synced' as const } }))
+          );
+          itemsSubidos += turnosPendientes.length;
+        }
+      }
+
+      if (itemsSubidos > 0 && !silent) {
+        toast.success(`${itemsSubidos} registros sincronizados a la nube`);
+      }
+
+      // ======================================================
+      // 2. SYNC DOWN (Descargar catálogos usando TRANSACCIÓN)
+      // ======================================================
+      const [resPrendas, resOperaciones, resColores] = await Promise.all([
+        supabase.from('prendas').select('*').eq('activo', true),
+        supabase.from('operaciones').select('*').eq('activo', true),
+        supabase.from('colores').select('*').eq('activo', true)
+      ]);
+
+      if (resPrendas.error || resOperaciones.error || resColores.error) {
+        throw new Error("Error al descargar catálogos de Supabase");
+      }
 
       await db.transaction('rw', db.prendas, db.operaciones, db.colores, async () => {
         await db.prendas.clear();
         await db.operaciones.clear();
         await db.colores.clear();
 
-        if (prendasRes.data.length > 0) await db.prendas.bulkAdd(prendasRes.data);
-        if (operacionesRes.data.length > 0) await db.operaciones.bulkAdd(operacionesRes.data);
-        if (coloresRes.data.length > 0) await db.colores.bulkAdd(coloresRes.data);
+        if (resPrendas.data?.length) await db.prendas.bulkAdd(resPrendas.data);
+        if (resOperaciones.data?.length) await db.operaciones.bulkAdd(resOperaciones.data);
+        if (resColores.data?.length) await db.colores.bulkAdd(resColores.data);
       });
-      
-    } catch (error) {
-      console.error('Error sincronizando catálogos hacia abajo:', error);
-    }
-  }, []);
-
-  const syncLogsUp = useCallback(async () => {
-    if (!navigator.onLine) return;
-
-    try {
-      // --- 1. SINCRONIZAR REGISTROS DE PRODUCCIÓN ---
-      const pendingLogs = await db.registros_produccion
-        .where('sync_status')
-        .equals('pending')
-        .toArray();
-
-      if (pendingLogs.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const payloadLogs = pendingLogs.map(({ id, sync_status, ...rest }) => rest);
-
-        const { error: logsError } = await supabase
-          .from('registros_produccion')
-          .upsert(payloadLogs, { onConflict: 'local_id' });
-
-        if (logsError) throw logsError;
-
-        const syncedLogIds = pendingLogs.map(log => log.id!);
-        await db.transaction('rw', db.registros_produccion, async () => {
-          await Promise.all(
-            syncedLogIds.map(id => db.registros_produccion.update(id, { sync_status: 'synced' }))
-          );
-        });
-      }
-
-      // --- 2. SINCRONIZAR TURNOS ---
-      const pendingTurnos = await db.turnos
-        .where('sync_status')
-        .equals('pending')
-        .toArray();
-
-      if (pendingTurnos.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const payloadTurnos = pendingTurnos.map(({ id, sync_status, ...rest }) => rest);
-
-        const { error: turnosError } = await supabase
-          .from('turnos')
-          .upsert(payloadTurnos, { onConflict: 'local_id' });
-
-        if (turnosError) throw turnosError;
-
-        const syncedTurnoIds = pendingTurnos.map(turno => turno.id!);
-        await db.transaction('rw', db.turnos, async () => {
-          await Promise.all(
-            syncedTurnoIds.map(id => db.turnos.update(id, { sync_status: 'synced' }))
-          );
-        });
-      }
-
-      if (pendingLogs.length > 0 || pendingTurnos.length > 0) {
-        toast.success(`Sincronización completada: ${pendingLogs.length} bultos, ${pendingTurnos.length} eventos de turno.`);
-      }
 
     } catch (error) {
-      console.error('Error subiendo registros de producción y turnos:', error);
+      console.error("Error en sincronización:", error);
+      if (!silent) toast.error("Error en sincronización. Reintentando en breve.");
+    } finally {
+      isSyncingGlobal = false;
+      setIsSyncing(false);
     }
   }, []);
-
-  const triggerSync = useCallback(async () => {
-    setIsSyncing(true);
-    await syncCatalogsDown();
-    await syncLogsUp();
-    setIsSyncing(false);
-  }, [syncCatalogsDown, syncLogsUp]);
 
   useEffect(() => {
-    triggerSync();
-    window.addEventListener('online', triggerSync);
-    return () => window.removeEventListener('online', triggerSync);
+    const handleOnline = () => {
+      triggerSync(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
   }, [triggerSync]);
 
-  return { isSyncing, triggerSync, syncCatalogsDown, syncLogsUp };
+  return { isSyncing, triggerSync };
 }
