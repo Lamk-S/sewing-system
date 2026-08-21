@@ -1,18 +1,15 @@
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Toaster } from 'sonner'
 import { AuthProvider } from '../shared/auth/AuthProvider'
 import RoutesApp from './RoutesApp'
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       networkMode: 'offlineFirst',
-      retry: (failureCount) => {
-        if (!navigator.onLine) return false;
-        return failureCount < 3;
-      },
-      refetchOnWindowFocus: false, 
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 60 * 5,
     },
   },
 })
@@ -20,11 +17,12 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
           <RoutesApp />
-        </BrowserRouter>
-      </AuthProvider>
+          <Toaster position="top-center" richColors />
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }
