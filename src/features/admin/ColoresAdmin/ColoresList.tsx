@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAdmin } from '../../../shared/hooks/useAdmin'
 import { DataTable } from '../../../shared/components/ui/DataTable'
 import { ColorForm } from './ColorForm'
-import { Plus } from 'lucide-react'
+import { Plus, Edit, Trash2 } from 'lucide-react'
 import type { Database } from '../../../types/supabase'
 
 type Color = Database['public']['Tables']['colores']['Row']
@@ -13,6 +13,12 @@ export default function ColoresList() {
   const [editingColor, setEditingColor] = useState<Color | null>(null)
   const [showForm, setShowForm] = useState(false)
 
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Estás seguro de eliminar este color?')) return
+    await deleteColor(id)
+    await refetchColores()
+  }
+
   const columns = [
     {
       accessorKey: 'nombre',
@@ -21,14 +27,14 @@ export default function ColoresList() {
     {
       accessorKey: 'codigo_hex',
       header: 'Código HEX',
-      cell: ({ row }: { row: { original: Color } }) => (
+      cell: (color: Color) => (
         <div className="flex items-center gap-3">
           <div
             className="w-6 h-6 rounded-md border border-slate-200 shadow-sm"
-            style={{ backgroundColor: row.original.codigo_hex ?? '#ccc' }}
+            style={{ backgroundColor: color.codigo_hex ?? '#ccc' }}
           />
           <span className="font-mono text-sm text-slate-600 uppercase">
-            {row.original.codigo_hex}
+            {color.codigo_hex}
           </span>
         </div>
       ),
@@ -36,23 +42,41 @@ export default function ColoresList() {
     {
       accessorKey: 'activo',
       header: 'Estado',
-      cell: ({ row }: { row: { original: Color } }) => (
+      cell: (color: Color) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-          row.original.activo 
+          color.activo 
             ? 'bg-emerald-100 text-emerald-800' 
             : 'bg-slate-100 text-slate-600'
         }`}>
-          {row.original.activo ? 'Activo' : 'Inactivo'}
+          {color.activo ? 'Activo' : 'Inactivo'}
         </span>
       )
     },
+    {
+      header: 'Acciones',
+      cell: (color: Color) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setEditingColor(color)
+              setShowForm(true)
+            }}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            title="Editar"
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={() => handleDelete(color.id)}
+            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )
+    }
   ]
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este color?')) return
-    await deleteColor(id)
-    await refetchColores()
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -75,11 +99,6 @@ export default function ColoresList() {
       <DataTable
         columns={columns}
         data={colores}
-        onEdit={(color: Color) => {
-          setEditingColor(color)
-          setShowForm(true)
-        }}
-        onDelete={handleDelete}
       />
 
       {showForm && (

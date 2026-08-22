@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAdmin } from '../../../shared/hooks/useAdmin'
 import { DataTable } from '../../../shared/components/ui/DataTable'
 import { PrendaForm } from './PrendaForm'
-import { Plus } from 'lucide-react'
+import { Plus, Edit, Trash2 } from 'lucide-react'
 import type { Database } from '../../../types/supabase'
 
 type Prenda = Database['public']['Tables']['prendas']['Row']
@@ -13,44 +13,68 @@ export default function PrendasList() {
   const [editingPrenda, setEditingPrenda] = useState<Prenda | null>(null)
   const [showForm, setShowForm] = useState(false)
 
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Estás seguro de eliminar esta prenda? Sus operaciones también se eliminarán.')) return
+    await deletePrenda(id)
+  }
+
   const columns = [
     {
       accessorKey: 'codigo',
       header: 'Código',
-      cell: ({ row }: { row: { original: Prenda } }) => (
+      cell: (prenda: Prenda) => (
         <span className="font-mono text-sm font-medium text-slate-600">
-          {row.original.codigo}
+          {prenda.codigo}
         </span>
       )
     },
     {
       accessorKey: 'nombre',
       header: 'Nombre de la Prenda',
-      cell: ({ row }: { row: { original: Prenda } }) => (
+      cell: (prenda: Prenda) => (
         <span className="font-medium text-slate-800">
-          {row.original.nombre}
+          {prenda.nombre}
         </span>
       )
     },
     {
       accessorKey: 'activo',
       header: 'Estado',
-      cell: ({ row }: { row: { original: Prenda } }) => (
+      cell: (prenda: Prenda) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-          row.original.activo 
+          prenda.activo 
             ? 'bg-emerald-100 text-emerald-800' 
             : 'bg-slate-100 text-slate-600'
         }`}>
-          {row.original.activo ? 'Activo' : 'Inactivo'}
+          {prenda.activo ? 'Activo' : 'Inactivo'}
         </span>
       ),
     },
+    {
+      header: 'Acciones',
+      cell: (prenda: Prenda) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setEditingPrenda(prenda)
+              setShowForm(true)
+            }}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            title="Editar"
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={() => handleDelete(prenda.id)}
+            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )
+    }
   ]
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar esta prenda? Sus operaciones también se eliminarán.')) return
-    await deletePrenda(id)
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -73,11 +97,6 @@ export default function PrendasList() {
       <DataTable
         columns={columns}
         data={prendas}
-        onEdit={(prenda: Prenda) => {
-          setEditingPrenda(prenda)
-          setShowForm(true)
-        }}
-        onDelete={handleDelete}
       />
 
       {showForm && (

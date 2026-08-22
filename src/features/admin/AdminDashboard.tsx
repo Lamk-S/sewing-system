@@ -9,25 +9,10 @@ import HistorialGlobal from './HistorialGlobal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/components/ui/tabs'
 import { Users, LayoutDashboard, Calendar as CalendarIcon, FileSpreadsheet, FileText, AlertCircle, History, Shirt, Scissors, Palette } from 'lucide-react'
 import { exportToExcel, exportToPDF } from '../../shared/lib/exportUtils'
+import type { Database } from '../../types/supabase'
 
-type RawRanking = {
-  id: string
-  nombres: string
-  apellidos: string
-  fecha: string
-  total_piezas: number
-  total_ganado: number
-}
-
-type RawEficiencia = {
-  id: string
-  nombres: string
-  apellidos: string
-  fecha: string
-  total_horas: number
-  total_ganado: number
-  eficiencia: number
-}
+type RawRanking = Database['public']['Views']['v_ranking_trabajadores']['Row']
+type RawEficiencia = Database['public']['Views']['v_eficiencia_trabajadores']['Row']
 
 interface TrabajadorMetrics {
   id: string
@@ -41,13 +26,16 @@ interface TrabajadorMetrics {
   [key: string]: unknown 
 }
 
-// 1. Componente extraído para limpiar el JSX principal
 const MetricCard = ({ title, value, borderClass = 'border-slate-200' }: { title: string; value: string | number; borderClass?: string }) => (
-  <div className={`p-5 bg-white shadow-sm rounded-xl border ${borderClass} flex flex-col justify-center`}>
+  <div className={`p-5 bg-white shadow-sm rounded-xl border ${borderClass} flex flex-col justify-center h-full`}>
     <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
     <p className="text-3xl font-bold text-slate-900 tracking-tight">{value}</p>
   </div>
 )
+
+const getLocalFormattedDate = (date: Date) => {
+  return date.toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+}
 
 export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState('')
@@ -73,20 +61,42 @@ export default function AdminDashboard() {
       if (r1.error) throw r1.error
       if (r2.error) throw r2.error
 
-      const rawRanking = (r1.data as unknown as RawRanking[]) || []
-      const rawEficiencia = (r2.data as unknown as RawEficiencia[]) || []
+      const rawRanking = r1.data as RawRanking[] || []
+      const rawEficiencia = r2.data as RawEficiencia[] || []
 
       const mapRanking = rawRanking.reduce((acc, curr) => {
-        if (!acc[curr.id]) acc[curr.id] = { ...curr, total_piezas: 0, total_ganado: 0, total_horas: 0, eficiencia: 0 }
-        acc[curr.id].total_piezas += (curr.total_piezas || 0)
-        acc[curr.id].total_ganado += (curr.total_ganado || 0)
+        const id = curr.id || 'desconocido'
+        if (!acc[id]) {
+          acc[id] = { 
+            id, 
+            nombres: curr.nombres || '', 
+            apellidos: curr.apellidos || '', 
+            total_piezas: 0, 
+            total_ganado: 0, 
+            total_horas: 0, 
+            eficiencia: 0 
+          }
+        }
+        acc[id].total_piezas += (Number(curr.total_piezas) || 0)
+        acc[id].total_ganado += (Number(curr.total_ganado) || 0)
         return acc
       }, {} as Record<string, TrabajadorMetrics>)
 
       const mapEficiencia = rawEficiencia.reduce((acc, curr) => {
-        if (!acc[curr.id]) acc[curr.id] = { ...curr, total_piezas: 0, total_horas: 0, total_ganado: 0, eficiencia: 0 }
-        acc[curr.id].total_horas += (curr.total_horas || 0)
-        acc[curr.id].total_ganado += (curr.total_ganado || 0)
+        const id = curr.id || 'desconocido'
+        if (!acc[id]) {
+          acc[id] = { 
+            id, 
+            nombres: curr.nombres || '', 
+            apellidos: curr.apellidos || '', 
+            total_piezas: 0, 
+            total_horas: 0, 
+            total_ganado: 0, 
+            eficiencia: 0 
+          }
+        }
+        acc[id].total_horas += (Number(curr.total_horas) || 0)
+        acc[id].total_ganado += (Number(curr.total_ganado) || 0)
         return acc
       }, {} as Record<string, TrabajadorMetrics>)
 
@@ -107,14 +117,13 @@ export default function AdminDashboard() {
   const rankingData = data?.ranking || []
   const eficienciaData = data?.eficiencia || []
 
-  // Métricas Globales calculadas eficientemente
+  // Métricas Globales
   const totalTrabajadoresPeriodo = rankingData.length
   const totalPiezasPeriodo = rankingData.reduce((acc, curr) => acc + curr.total_piezas, 0)
   const totalGanadoPeriodo = rankingData.reduce((acc, curr) => acc + curr.total_ganado, 0)
 
-  // Manejadores de fechas robustos
   const setHoy = () => {
-    const today = new Date().toLocaleDateString('en-CA')
+    const today = getLocalFormattedDate(new Date())
     setFromDate(today)
     setToDate(today)
   }
@@ -126,16 +135,18 @@ export default function AdminDashboard() {
     first.setDate(now.getDate() - dayOfWeek + 1)
     const last = new Date(first)
     last.setDate(first.getDate() + 6)
-    setFromDate(first.toLocaleDateString('en-CA'))
-    setToDate(last.toLocaleDateString('en-CA'))
+    
+    setFromDate(getLocalFormattedDate(first))
+    setToDate(getLocalFormattedDate(last))
   }
 
   const setMes = () => {
     const now = new Date()
     const first = new Date(now.getFullYear(), now.getMonth(), 1)
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    setFromDate(first.toLocaleDateString('en-CA'))
-    setToDate(last.toLocaleDateString('en-CA'))
+    
+    setFromDate(getLocalFormattedDate(first))
+    setToDate(getLocalFormattedDate(last))
   }
 
   return (
@@ -232,29 +243,29 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* MÉTRICAS */}
+      {/* MÉTRICAS GLOBALES */}
       {isLoading ? (
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-26 bg-slate-200 animate-pulse rounded-xl" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-28 bg-slate-200 animate-pulse rounded-xl" />)}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 items-stretch">
           <MetricCard title="Trabajadores Activos" value={totalTrabajadoresPeriodo} />
           <MetricCard title="Piezas Confeccionadas" value={totalPiezasPeriodo} />
           <MetricCard title="Inversión / Pago Total" value={`$${totalGanadoPeriodo.toFixed(2)}`} />
         </div>
       )}
 
-      {/* RANKING Y EFICIENCIA (RSPONSIVE HEIGHTS) */}
-      <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-80 md:h-96 xl:h-112.5">
+      {/* RANKING Y EFICIENCIA (Diseño Elástico) */}
+      <div className="grid lg:grid-cols-2 gap-6 mb-8 items-stretch">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-96 h-full">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
             <Users size={18} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-slate-800">Ranking de Producción</h2>
           </div>
-          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin">
+          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin max-h-125">
             {rankingData.length === 0 && !isLoading ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-37.5 text-slate-400">
+              <div className="flex flex-col items-center justify-center h-full min-h-50 text-slate-400">
                 <LayoutDashboard size={32} className="mb-2 opacity-50" />
                 <p className="text-sm font-medium">Sin datos en este periodo</p>
               </div>
@@ -271,15 +282,15 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-80 md:h-96 xl:h-112.5">
+        
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-96 h-full">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
             <CalendarIcon size={18} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-slate-800">Eficiencia por Hora</h2>
           </div>
-          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin">
+          <div className="overflow-y-auto p-2 flex-1 scrollbar-thin max-h-125">
             {eficienciaData.length === 0 && !isLoading ? (
-               <div className="flex flex-col items-center justify-center h-full min-h-37.5 text-slate-400">
+               <div className="flex flex-col items-center justify-center h-full min-h-50 text-slate-400">
                  <LayoutDashboard size={32} className="mb-2 opacity-50" />
                  <p className="text-sm font-medium">Sin datos en este periodo</p>
                </div>
