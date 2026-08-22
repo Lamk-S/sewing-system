@@ -33,7 +33,6 @@ export default function HistorialGlobal() {
       if (error) throw error
       return data as RegistroGlobal[]
     },
-    refetchInterval: 30000
   })
 
   if (isLoading) {

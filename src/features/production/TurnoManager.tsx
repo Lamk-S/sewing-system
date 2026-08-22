@@ -17,12 +17,18 @@ type TurnoConPerfil = {
   } | null;
 }
 
+// Garantiza formato YYYY-MM-DD en la zona horaria de Perú
+const getLocalDateString = (date: Date) => {
+  return date.toLocaleDateString('en-CA', { 
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+}
+
 export default function TurnoManager() {
   const { session, isAdmin } = useAuth()
   const [guardando, setGuardando] = useState(false)
   const { triggerSync } = useSyncCatalogs()
 
-  // --- LÓGICA LOCAL (TRABAJADOR) ---
   const turnoActivo = useLiveQuery(
     async () => {
       if (!session || isAdmin) return null;
@@ -35,7 +41,6 @@ export default function TurnoManager() {
     [session, isAdmin]
   )
 
-  // --- LÓGICA ONLINE (ADMINISTRADOR) ---
   const { data: turnosGlobales, isLoading: loadingAdmin } = useQuery({
     queryKey: ['turnos-abiertos-admin'],
     queryFn: async () => {
@@ -54,9 +59,6 @@ export default function TurnoManager() {
 
   if (!session) return null
 
-  // ==========================================
-  // VISTA 1: PANEL ADMINISTRADOR
-  // ==========================================
   if (isAdmin) {
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-6 mt-4">
@@ -113,14 +115,11 @@ export default function TurnoManager() {
     )
   }
 
-  // ==========================================
-  // VISTA 2: PANEL TRABAJADOR
-  // ==========================================
   const iniciarTurno = async () => {
     setGuardando(true)
     try {
       const localId = crypto.randomUUID()
-      const fechaActual = new Date().toISOString().split('T')[0]
+      const fechaActual = getLocalDateString(new Date()) 
       const horaInicio = new Date().toISOString()
 
       await db.turnos.add({
@@ -132,7 +131,9 @@ export default function TurnoManager() {
         sync_status: 'pending' 
       })
       
-      toast.success("Turno iniciado exitosamente")
+      toast.success("Turno local iniciado", {
+        description: 'La sincronización se hará en segundo plano.'
+      })
       triggerSync()
     } catch (error) {
       console.error(error)
@@ -148,7 +149,10 @@ export default function TurnoManager() {
     setGuardando(true)
     try {
       const horaFin = new Date().toISOString()
-      const duracion = (new Date(horaFin).getTime() - new Date(turnoActivo.hora_inicio).getTime()) / 3600000
+      
+      // INTEGRIDAD: Prevenir horas negativas si el usuario manipuló su reloj
+      const diffMs = new Date(horaFin).getTime() - new Date(turnoActivo.hora_inicio).getTime();
+      const duracion = Math.max(0, diffMs / 3600000);
 
       await db.turnos.update(turnoActivo.id, {
         hora_fin: horaFin,
@@ -157,7 +161,9 @@ export default function TurnoManager() {
         sync_status: 'pending' 
       })
       
-      toast.success(`Turno cerrado. Tiempo: ${duracion.toFixed(2)} hrs`)
+      toast.success(`Turno cerrado`, {
+        description: `Tiempo local registrado: ${duracion.toFixed(2)} hrs`
+      })
       triggerSync()
     } catch (err) {
       console.error(err)

@@ -9,16 +9,29 @@ export default function ProduccionHistory() {
   const historialCompleto = useLiveQuery(async () => {
     if (!session) return null;
 
+    // 1. Obtener registros
     const registrosLocales = await db.registros_produccion
       .where('trabajador_id').equals(session.user.id)
       .reverse()
       .sortBy('created_at');
 
-    return Promise.all(registrosLocales.map(async (reg) => {
-      const operacion = await db.operaciones.get(reg.operacion_id!);
-      const color = await db.colores.get(reg.color_id!);
-      
-      return { ...reg, operacion, color };
+    if (registrosLocales.length === 0) return [];
+
+    // 2. Descargar catálogos completos (2 consultas estáticas) en lugar de N+1
+    const [operaciones, colores] = await Promise.all([
+      db.operaciones.toArray(),
+      db.colores.toArray()
+    ]);
+
+    // 3. Crear diccionarios de acceso O(1)
+    const operacionesMap = new Map(operaciones.map(o => [o.id, o]));
+    const coloresMap = new Map(colores.map(c => [c.id, c]));
+
+    // 4. Mapeo síncrono rápido en memoria
+    return registrosLocales.map((reg) => ({
+      ...reg,
+      operacion: operacionesMap.get(reg.operacion_id!),
+      color: coloresMap.get(reg.color_id!)
     }));
   }, [session])
 

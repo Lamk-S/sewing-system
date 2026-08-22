@@ -4,7 +4,7 @@ import { DataTable } from '../../../shared/components/ui/DataTable'
 import { OperacionForm } from './OperacionForm'
 import { supabase } from '../../../shared/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Edit, Trash2 } from 'lucide-react'
 import type { Database } from '../../../types/supabase'
 
 type Operacion = Database['public']['Tables']['operaciones']['Row'] & {
@@ -49,16 +49,16 @@ export default function OperacionesList() {
     {
       accessorKey: 'nombre',
       header: 'Operación',
-      cell: ({ row }: { row: { original: Operacion } }) => (
-        <span className="font-medium text-slate-800">{row.original.nombre}</span>
+      cell: (op: Operacion) => (
+        <span className="font-medium text-slate-800">{op.nombre}</span>
       )
     },
     {
       accessorKey: 'prenda.nombre',
       header: 'Prenda',
-      cell: ({ row }: { row: { original: Operacion } }) => 
-        row.original.prenda ? (
-          <span className="text-slate-600">{row.original.prenda.nombre} ({row.original.prenda.codigo})</span>
+      cell: (op: Operacion) => 
+        op.prenda ? (
+          <span className="text-slate-600">{op.prenda.nombre} ({op.prenda.codigo})</span>
         ) : (
           <span className="text-slate-400 italic">Sin asignar</span>
         )
@@ -66,33 +66,62 @@ export default function OperacionesList() {
     {
       accessorKey: 'precio_fijo',
       header: 'Precio Fijo',
-      cell: ({ row }: { row: { original: Operacion } }) => (
+      cell: (op: Operacion) => (
         <span className="font-bold text-slate-700">
-          ${row.original.precio_fijo.toFixed(2)}
+          ${op.precio_fijo.toFixed(2)}
         </span>
       ),
     },
     {
       accessorKey: 'tiempo_estimado_minutos',
       header: 'Tiempo (min)',
-      cell: ({ row }: { row: { original: Operacion } }) =>
-        row.original.tiempo_estimado_minutos ? (
-          <span className="text-slate-600">{row.original.tiempo_estimado_minutos} min</span>
+      cell: (op: Operacion) =>
+        op.tiempo_estimado_minutos ? (
+          <span className="text-slate-600">{op.tiempo_estimado_minutos} min</span>
         ) : '-',
     },
     {
       accessorKey: 'activo',
       header: 'Estado',
-      cell: ({ row }: { row: { original: Operacion } }) => (
+      cell: (op: Operacion) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-          row.original.activo 
+          op.activo 
             ? 'bg-emerald-100 text-emerald-800' 
             : 'bg-slate-100 text-slate-600'
         }`}>
-          {row.original.activo ? 'Activo' : 'Inactivo'}
+          {op.activo ? 'Activo' : 'Inactivo'}
         </span>
       )
     },
+    {
+      header: 'Acciones',
+      cell: (op: Operacion) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setEditingOperacion(op)
+              setShowForm(true)
+            }}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            title="Editar"
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (confirm('¿Estás seguro de eliminar esta operación?')) {
+                await deleteOperacion(op.id)
+                await refetch()
+              }
+            }}
+            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )
+    }
   ]
 
   return (
@@ -116,16 +145,6 @@ export default function OperacionesList() {
       <DataTable
         columns={columns}
         data={operaciones}
-        onEdit={(op: Operacion) => {
-          setEditingOperacion(op)
-          setShowForm(true)
-        }}
-        onDelete={async (id: number) => {
-          if (confirm('¿Estás seguro de eliminar esta operación?')) {
-            await deleteOperacion(id)
-            await refetch()
-          }
-        }}
       />
 
       {showForm && (
