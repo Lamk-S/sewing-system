@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../shared/lib/db' 
 import { useAuth } from '../../shared/auth/AuthProvider'
@@ -10,7 +10,7 @@ const TALLAS_DISPONIBLES = ['Única', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
 export default function RegistroTrabajador() {
   const { session } = useAuth()
   
-  // Lectura Offline-First garantizada
+  // Lectura Offline-First
   const prendas = useLiveQuery(() => db.prendas.toArray())
   const operaciones = useLiveQuery(() => db.operaciones.toArray())
   const colores = useLiveQuery(() => db.colores.toArray())
@@ -25,6 +25,8 @@ export default function RegistroTrabajador() {
   const [lote, setLote] = useState('')
   
   const [isSaving, setIsSaving] = useState(false)
+  
+  const cantidadInputRef = useRef<HTMLInputElement>(null)
 
   const turnoActivo = useLiveQuery(
     async () => {
@@ -37,7 +39,6 @@ export default function RegistroTrabajador() {
     [session]
   )
 
-  // Rendimiento: Evitamos recalcular el filtro en cada re-render (tecleo en inputs)
   const operacionesFiltradas = useMemo(() => {
     if (!operaciones || !prendaId) return []
     return operaciones.filter(o => String(o.prenda_id) === prendaId)
@@ -50,8 +51,10 @@ export default function RegistroTrabajador() {
       return
     }
 
-    if (Number(cantidad) <= 0) {
-      toast.error("La cantidad debe ser mayor a 0.")
+    const cantNumerica = Number(cantidad)
+    if (!cantidad || isNaN(cantNumerica) || cantNumerica <= 0 || !Number.isInteger(cantNumerica)) {
+      toast.error("Ingresa una cantidad de piezas válida (número entero positivo).")
+      cantidadInputRef.current?.focus()
       return
     }
 
@@ -62,7 +65,7 @@ export default function RegistroTrabajador() {
         trabajador_id: session.user.id,
         operacion_id: Number(operacionId),
         color_id: Number(colorId),
-        cantidad: Number(cantidad),
+        cantidad: cantNumerica, // Seguro
         talla: talla,
         lote: lote.trim().toUpperCase(),
         fecha_trabajo: turnoActivo.fecha,
@@ -70,10 +73,12 @@ export default function RegistroTrabajador() {
         created_at: new Date().toISOString()
       })
 
-      toast.success("Bulto registrado exitosamente", {
+      toast.success("Bulto guardado localmente", {
         className: 'bg-emerald-50 text-emerald-800 border-emerald-200'
       })
-      setCantidad('') // Reset rápido para el siguiente bulto
+      
+      setCantidad('') 
+      cantidadInputRef.current?.focus()
     } catch (error) {
       console.error(error)
       toast.error("Error al guardar localmente")
@@ -113,8 +118,6 @@ export default function RegistroTrabajador() {
         className={`space-y-6 ${!turnoActivo ? 'opacity-50 pointer-events-none' : ''}`}
         aria-disabled={!turnoActivo}
       >
-        
-        {/* Fila 1: Catálogos Principales */}
         <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 space-y-4">
           <div>
             <label htmlFor="prendaSelect" className="block text-sm font-semibold text-slate-900 mb-1.5">
@@ -125,7 +128,7 @@ export default function RegistroTrabajador() {
               value={prendaId}
               onChange={(e) => {
                 setPrendaId(e.target.value)
-                setOperacionId('') // Reset dependencia
+                setOperacionId('') 
               }}
               className="w-full min-h-11 p-2.5 bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
               required
@@ -158,7 +161,6 @@ export default function RegistroTrabajador() {
           </div>
         </div>
 
-        {/* Fila 2: Variantes */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label htmlFor="colorSelect" className="block text-sm font-semibold text-slate-900 mb-1.5">
@@ -212,7 +214,6 @@ export default function RegistroTrabajador() {
           </div>
         </div>
 
-        {/* Fila 3: Cantidad y Submit */}
         <div className="pt-4 border-t border-slate-100">
           <label htmlFor="cantidadInput" className="block text-sm font-semibold text-slate-900 mb-2">
             3. Cantidad final del bulto
@@ -220,8 +221,10 @@ export default function RegistroTrabajador() {
           <div className="flex flex-col sm:flex-row gap-4">
             <input
               id="cantidadInput"
+              ref={cantidadInputRef}
               type="number"
               min="1"
+              step="1"
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
               className="w-full sm:w-32 min-h-12 p-3 text-center text-xl font-bold bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow text-slate-900 shadow-sm"
