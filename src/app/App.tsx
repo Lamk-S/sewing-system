@@ -8,8 +8,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       networkMode: 'offlineFirst',
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: true, 
+      staleTime: 1000 * 60 * 2,
+      retry: 1,
     },
   },
 })
@@ -20,7 +21,17 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <RoutesApp />
-          <Toaster position="top-center" richColors />
+          <Toaster 
+            position="top-right" 
+            richColors 
+            expand={true} 
+            visibleToasts={4}
+            closeButton
+            duration={4000}
+            toastOptions={{
+              className: 'text-sm font-medium border border-slate-200 shadow-lg',
+            }}
+          />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
