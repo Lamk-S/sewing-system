@@ -7,14 +7,15 @@ import ColoresList from './ColoresAdmin/ColoresList'
 import OperacionesList from './OperacionesAdmin/OperacionesList'
 import HistorialGlobal from './HistorialGlobal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/components/ui/tabs'
-import { Users, LayoutDashboard, Calendar as CalendarIcon, FileSpreadsheet, FileText, AlertCircle, History, Shirt, Scissors, Palette } from 'lucide-react'
+import { Users, LayoutDashboard, Calendar as CalendarIcon, FileSpreadsheet, FileText, AlertCircle, History, Shirt, Scissors, Palette, Loader2 } from 'lucide-react'
 import { exportToExcel, exportToPDF } from '../../shared/lib/exportUtils'
+import { toast } from 'sonner'
 import type { Database } from '../../types/supabase'
 
 type RawRanking = Database['public']['Views']['v_ranking_trabajadores']['Row']
 type RawEficiencia = Database['public']['Views']['v_eficiencia_trabajadores']['Row']
 
-interface TrabajadorMetrics {
+type TrabajadorMetrics = {
   id: string
   nombres: string
   apellidos: string
@@ -23,7 +24,6 @@ interface TrabajadorMetrics {
   total_horas: number
   eficiencia: number
   fecha?: string
-  [key: string]: unknown 
 }
 
 const MetricCard = ({ title, value, borderClass = 'border-slate-200' }: { title: string; value: string | number; borderClass?: string }) => (
@@ -40,8 +40,9 @@ const getLocalFormattedDate = (date: Date) => {
 export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ['dashboard-metrics', fromDate, toDate],
     queryFn: async () => {
       let qRanking = supabase.from('v_ranking_trabajadores').select('*')
@@ -61,8 +62,8 @@ export default function AdminDashboard() {
       if (r1.error) throw r1.error
       if (r2.error) throw r2.error
 
-      const rawRanking = r1.data as RawRanking[] || []
-      const rawEficiencia = r2.data as RawEficiencia[] || []
+      const rawRanking = (r1.data as RawRanking[]) || []
+      const rawEficiencia = (r2.data as RawEficiencia[]) || []
 
       const mapRanking = rawRanking.reduce((acc, curr) => {
         const id = curr.id || 'desconocido'
@@ -149,9 +150,46 @@ export default function AdminDashboard() {
     setToDate(getLocalFormattedDate(last))
   }
 
+  const handleExportExcel = async () => {
+    setIsExporting(true)
+    try {
+      const filename = `Ranking_Produccion_${getLocalFormattedDate(new Date())}`
+      await exportToExcel(rankingData, filename)
+      toast.success("Excel generado correctamente")
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al generar el archivo Excel")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    try {
+      const filename = `Ranking_Produccion_${getLocalFormattedDate(new Date())}`
+      await exportToPDF(
+        rankingData, 
+        [
+          { header: 'Nombres', dataKey: 'nombres' },
+          { header: 'Apellidos', dataKey: 'apellidos' },
+          { header: 'Piezas', dataKey: 'total_piezas' },
+          { header: 'Total Ganado', dataKey: 'total_ganado', format: 'currency' }
+        ],
+        filename,
+        `Reporte de Producción (Destajo)`
+      )
+      toast.success("PDF generado correctamente")
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al generar el archivo PDF")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="container mx-auto max-w-7xl px-4 md:px-6 py-6 md:py-8 animate-in fade-in duration-300">
-      
       {/* HEADER */}
       <div className="mb-8 border-b border-slate-200 pb-5">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-3">
@@ -173,19 +211,20 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2 w-full md:w-auto">
             <CalendarIcon className="text-slate-500 hidden sm:block shrink-0" size={20} aria-hidden="true" />
             
-            {/* Contenedor Grid para móviles, Flex para desktop */}
             <div className="grid grid-cols-[1fr_auto_1fr] sm:flex items-center gap-2 w-full sm:w-auto">
+              <label htmlFor="fromDate" className="sr-only">Fecha de inicio</label>
               <input 
+                id="fromDate"
                 type="date" 
-                aria-label="Fecha de inicio"
                 value={fromDate} 
                 onChange={(e) => setFromDate(e.target.value)} 
                 className="w-full sm:w-32 md:w-36 min-w-0 border border-slate-300 text-sm p-2 rounded-md text-slate-900 bg-white focus:ring-2 focus:ring-primary outline-none transition-shadow shadow-sm"
               />
               <span className="text-slate-400 text-sm font-medium shrink-0">a</span>
+              <label htmlFor="toDate" className="sr-only">Fecha de fin</label>
               <input 
+                id="toDate"
                 type="date" 
-                aria-label="Fecha de fin"
                 value={toDate} 
                 onChange={(e) => setToDate(e.target.value)} 
                 className="w-full sm:w-32 md:w-36 min-w-0 border border-slate-300 text-sm p-2 rounded-md text-slate-900 bg-white focus:ring-2 focus:ring-primary outline-none transition-shadow shadow-sm"
@@ -204,29 +243,19 @@ export default function AdminDashboard() {
         {/* Exportación */}
         <div className="flex gap-3 w-full lg:w-auto pt-4 lg:pt-0 border-t border-slate-200 lg:border-0">
           <button
-            onClick={() => exportToExcel(rankingData, `Ranking_${new Date().toISOString().split('T')[0]}`)}
-            disabled={rankingData.length === 0 || isLoading}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm"
+            onClick={handleExportExcel}
+            disabled={rankingData.length === 0 || isLoading || isExporting}
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm min-w-25"
           >
-            <FileSpreadsheet size={18} className="text-slate-500" />
+            {isExporting ? <Loader2 size={18} className="animate-spin text-slate-500" /> : <FileSpreadsheet size={18} className="text-slate-500" />}
             <span>Excel</span>
           </button>
           <button
-            onClick={() => exportToPDF(
-              rankingData, 
-              [
-                { header: 'Nombres', dataKey: 'nombres' },
-                { header: 'Apellidos', dataKey: 'apellidos' },
-                { header: 'Piezas', dataKey: 'total_piezas' },
-                { header: 'Total Ganado', dataKey: 'total_ganado' }
-              ],
-              `Ranking_${new Date().toISOString().split('T')[0]}`,
-              `Reporte de Producción (Destajo)`
-            )}
-            disabled={rankingData.length === 0 || isLoading}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm"
+            onClick={handleExportPDF}
+            disabled={rankingData.length === 0 || isLoading || isExporting}
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-md font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50 text-sm shadow-sm min-w-25"
           >
-            <FileText size={18} className="text-slate-500" />
+            {isExporting ? <Loader2 size={18} className="animate-spin text-slate-500" /> : <FileText size={18} className="text-slate-500" />}
             <span>PDF</span>
           </button>
         </div>
@@ -249,16 +278,17 @@ export default function AdminDashboard() {
           {[1, 2, 3].map(i => <div key={i} className="h-28 bg-slate-200 animate-pulse rounded-xl" />)}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 items-stretch">
-          <MetricCard title="Trabajadores Activos" value={totalTrabajadoresPeriodo} />
+        <div className={`grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 items-stretch transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          <MetricCard title="Operarios con Producción" value={totalTrabajadoresPeriodo} />
           <MetricCard title="Piezas Confeccionadas" value={totalPiezasPeriodo} />
           <MetricCard title="Inversión / Pago Total" value={`$${totalGanadoPeriodo.toFixed(2)}`} />
         </div>
       )}
 
-      {/* RANKING Y EFICIENCIA (Diseño Elástico) */}
-      <div className="grid lg:grid-cols-2 gap-6 mb-8 items-stretch">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-96 h-full">
+      {/* RANKING Y EFICIENCIA */}
+      <div className={`grid lg:grid-cols-2 gap-6 mb-8 items-stretch transition-opacity duration-200 ${isFetching && !isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        {/* RANKING */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-87.5 h-full">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
             <Users size={18} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-slate-800">Ranking de Producción</h2>
@@ -283,10 +313,11 @@ export default function AdminDashboard() {
           </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-96 h-full">
+        {/* EFICIENCIA */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-87.5 h-full">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 rounded-t-xl shrink-0">
             <CalendarIcon size={18} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-slate-800">Eficiencia por Hora</h2>
+            <h2 className="font-semibold text-slate-800">Eficiencia por Hora ($/hr)</h2>
           </div>
           <div className="overflow-y-auto p-2 flex-1 scrollbar-thin max-h-125">
             {eficienciaData.length === 0 && !isLoading ? (
@@ -300,7 +331,7 @@ export default function AdminDashboard() {
                   <span className="font-medium text-slate-700 group-hover:text-primary transition-colors">{e.nombres} {e.apellidos}</span>
                   <div className="text-right">
                     <span className="block text-sm text-slate-500">{e.total_horas.toFixed(1)}h trabajadas</span>
-                    <span className="block font-bold text-primary">${e.eficiencia.toFixed(2)}/h</span>
+                    <span className="block font-bold text-primary">${e.eficiencia.toFixed(2)}/hr</span>
                   </div>
                 </div>
               ))
@@ -326,7 +357,7 @@ export default function AdminDashboard() {
                 value="historial" 
                 className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                <History size={16} />
+                <History size={16} aria-hidden="true" />
                 <span>Historial</span>
               </TabsTrigger>
               
@@ -334,7 +365,7 @@ export default function AdminDashboard() {
                 value="prendas" 
                 className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                <Shirt size={16} />
+                <Shirt size={16} aria-hidden="true" />
                 <span>Prendas</span>
               </TabsTrigger>
               
@@ -342,7 +373,7 @@ export default function AdminDashboard() {
                 value="operaciones" 
                 className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                <Scissors size={16} />
+                <Scissors size={16} aria-hidden="true" />
                 <span>Operaciones</span>
               </TabsTrigger>
               
@@ -350,7 +381,7 @@ export default function AdminDashboard() {
                 value="colores" 
                 className="flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg outline-none text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 data-[state=active]:text-primary data-[state=active]:bg-white data-[state=active]:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                <Palette size={16} />
+                <Palette size={16} aria-hidden="true" />
                 <span>Colores</span>
               </TabsTrigger>
 

@@ -40,6 +40,14 @@ export class SewingDatabase extends Dexie {
       registros_produccion: '++id, local_id, trabajador_id, sync_status, fecha_trabajo',
       turnos: '++id, local_id, trabajador_id, fecha, estado, sync_status'
     });
+
+    this.version(3).stores({
+      prendas: 'id, activo',
+      operaciones: 'id, prenda_id, activo',
+      colores: 'id, activo',
+      registros_produccion: '++id, &local_id, trabajador_id, sync_status, fecha_trabajo',
+      turnos: '++id, &local_id, trabajador_id, fecha, estado, sync_status'
+    });
   }
 }
 
