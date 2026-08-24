@@ -4,12 +4,18 @@ import { History, FileX, Loader2 } from 'lucide-react'
 
 type RegistroGlobal = {
   id: number
-  cantidad: number
-  fecha_trabajo: string
-  created_at: string
+  cantidad: number | null
+  fecha_trabajo: string | null
+  created_at: string | null
+  talla: string | null
+  lote: string | null
   perfiles: { nombres: string; apellidos: string } | null
-  operaciones: { nombre: string; precio_fijo: number } | null
-  colores: { nombre: string; codigo_hex: string } | null
+  operaciones: { 
+    nombre: string; 
+    precio_fijo: number;
+    prendas: { nombre: string; codigo: string } | null;
+  } | null
+  colores: { nombre: string; codigo_hex: string | null } | null
 }
 
 export default function HistorialGlobal() {
@@ -23,8 +29,10 @@ export default function HistorialGlobal() {
           cantidad,
           fecha_trabajo,
           created_at,
+          talla,
+          lote,
           perfiles(nombres, apellidos),
-          operaciones(nombre, precio_fijo),
+          operaciones(nombre, precio_fijo, prendas(nombre, codigo)),
           colores(nombre, codigo_hex)
         `)
         .order('created_at', { ascending: false })
@@ -39,7 +47,7 @@ export default function HistorialGlobal() {
     return (
       <div className="flex flex-col justify-center items-center py-20 text-slate-500">
         <Loader2 className="animate-spin mb-3 text-slate-400" size={32} />
-        <span className="text-sm font-medium">Cargando historial del servidor...</span>
+        <span className="text-sm font-medium">Cargando historial...</span>
       </div>
     )
   }
@@ -67,49 +75,62 @@ export default function HistorialGlobal() {
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Trabajador</th>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Operación</th>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Color</th>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider text-center">Cant.</th>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider text-right">Pago</th>
-              <th className="px-5 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider text-right">Fecha/Hora</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Fecha/Hora</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Trabajador</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Prenda</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Lote/OP</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Operación</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Color/Talla</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider text-center">Cant.</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider text-right">Pago</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {historial.map((reg) => {
-              const pagoTotal = (reg.cantidad || 0) * (reg.operaciones?.precio_fijo || 0)
+              const precio = reg.operaciones?.precio_fijo || 0
+              const cantidad = reg.cantidad || 0
+              const pagoTotal = cantidad * precio
               
               return (
                 <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-semibold text-slate-900">
+                  <td className="px-4 py-3 text-slate-500 text-xs font-medium">
+                    {reg.created_at ? new Date(reg.created_at).toLocaleString([], {
+                      dateStyle: 'short', timeStyle: 'short'
+                    }) : '-'}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-900">
                     {reg.perfiles?.nombres} {reg.perfiles?.apellidos}
                   </td>
-                  <td className="px-5 py-3.5 text-slate-700">
-                    {reg.operaciones?.nombre}
+                  <td className="px-4 py-3 text-slate-700 font-medium">
+                    {reg.operaciones?.prendas ? (
+                      <span title={reg.operaciones.prendas.nombre}>{reg.operaciones.prendas.codigo}</span>
+                    ) : <span className="text-slate-400">-</span>}
                   </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-3 text-slate-600 font-mono text-xs">
+                    {reg.lote || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {reg.operaciones?.nombre || <span className="text-red-500 line-through">Eliminada</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
                       {reg.colores?.codigo_hex && (
                         <div 
-                          className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-sm" 
+                          className="w-3 h-3 rounded-full border border-slate-300 shadow-sm shrink-0" 
                           style={{ backgroundColor: reg.colores.codigo_hex }} 
                           aria-hidden="true"
                         />
                       )}
-                      <span className="text-slate-700 font-medium">{reg.colores?.nombre || 'N/A'}</span>
+                      <span className="text-slate-700 text-xs">
+                        {reg.colores?.nombre || '-'} {reg.talla ? `/ ${reg.talla}` : ''}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-center font-bold text-slate-900">
-                    {reg.cantidad}
+                  <td className="px-4 py-3 text-center font-bold text-slate-900">
+                    {cantidad}
                   </td>
-                  <td className="px-5 py-3.5 text-right font-bold text-slate-900">
+                  <td className="px-4 py-3 text-right font-bold text-emerald-700">
                     ${pagoTotal.toFixed(2)}
-                  </td>
-                  <td className="px-5 py-3.5 text-right text-slate-500 text-xs font-medium">
-                    {new Date(reg.created_at).toLocaleString([], {
-                      dateStyle: 'short',
-                      timeStyle: 'short'
-                    })}
                   </td>
                 </tr>
               )
