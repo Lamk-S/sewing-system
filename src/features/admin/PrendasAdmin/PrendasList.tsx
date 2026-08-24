@@ -2,20 +2,25 @@ import { useState } from 'react'
 import { useAdmin } from '../../../shared/hooks/useAdmin'
 import { DataTable } from '../../../shared/components/ui/DataTable'
 import { PrendaForm } from './PrendaForm'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Power, PowerOff } from 'lucide-react'
 import type { Database } from '../../../types/supabase'
 
 type Prenda = Database['public']['Tables']['prendas']['Row']
 
 export default function PrendasList() {
-  const { prendas, deletePrenda, loading } = useAdmin()
+  const { prendas, updatePrenda, loading } = useAdmin()
 
   const [editingPrenda, setEditingPrenda] = useState<Prenda | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar esta prenda? Sus operaciones también se eliminarán.')) return
-    await deletePrenda(id)
+  const handleToggleEstado = async (prenda: Prenda) => {
+    const accion = prenda.activo ? 'desactivar' : 'activar'
+    if (!confirm(`¿Estás seguro de ${accion} esta prenda?`)) return
+    
+    await updatePrenda({ 
+      id: prenda.id, 
+      updates: { activo: !prenda.activo } 
+    })
   }
 
   const columns = [
@@ -23,7 +28,7 @@ export default function PrendasList() {
       accessorKey: 'codigo',
       header: 'Código',
       cell: (prenda: Prenda) => (
-        <span className="font-mono text-sm font-medium text-slate-600">
+        <span className="font-mono text-sm font-bold text-slate-700">
           {prenda.codigo}
         </span>
       )
@@ -32,7 +37,7 @@ export default function PrendasList() {
       accessorKey: 'nombre',
       header: 'Nombre de la Prenda',
       cell: (prenda: Prenda) => (
-        <span className="font-medium text-slate-800">
+        <span className={`font-medium ${prenda.activo ? 'text-slate-800' : 'text-slate-400 line-through'}`}>
           {prenda.nombre}
         </span>
       )
@@ -43,8 +48,8 @@ export default function PrendasList() {
       cell: (prenda: Prenda) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
           prenda.activo 
-            ? 'bg-emerald-100 text-emerald-800' 
-            : 'bg-slate-100 text-slate-600'
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+            : 'bg-slate-100 text-slate-500 border border-slate-200'
         }`}>
           {prenda.activo ? 'Activo' : 'Inactivo'}
         </span>
@@ -53,23 +58,29 @@ export default function PrendasList() {
     {
       header: 'Acciones',
       cell: (prenda: Prenda) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => {
               setEditingPrenda(prenda)
               setShowForm(true)
             }}
-            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors focus:ring-2 focus:ring-blue-200 outline-none"
+            aria-label={`Editar prenda ${prenda.codigo}`}
             title="Editar"
           >
-            <Edit size={16} />
+            <Edit size={18} />
           </button>
           <button
-            onClick={() => handleDelete(prenda.id)}
-            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-            title="Eliminar"
+            onClick={() => handleToggleEstado(prenda)}
+            className={`p-2 rounded-md transition-colors focus:ring-2 outline-none ${
+              prenda.activo 
+                ? 'text-amber-600 hover:bg-amber-50 focus:ring-amber-200' 
+                : 'text-emerald-600 hover:bg-emerald-50 focus:ring-emerald-200'
+            }`}
+            aria-label={prenda.activo ? `Desactivar prenda ${prenda.codigo}` : `Activar prenda ${prenda.codigo}`}
+            title={prenda.activo ? 'Desactivar (Ocultar en producción)' : 'Activar (Mostrar en producción)'}
           >
-            <Trash2 size={16} />
+            {prenda.activo ? <PowerOff size={18} /> : <Power size={18} />}
           </button>
         </div>
       )
@@ -94,10 +105,7 @@ export default function PrendasList() {
         </button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={prendas}
-      />
+      <DataTable columns={columns} data={prendas} />
 
       {showForm && (
         <PrendaForm
