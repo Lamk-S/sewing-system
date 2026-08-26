@@ -68,7 +68,7 @@ export default function HistorialGlobal() {
         <div className="p-1.5 bg-primary/10 rounded-md">
           <History className="text-primary" size={18} aria-hidden="true" />
         </div>
-        <h3 className="font-bold text-slate-900">Últimos 100 Registros de Producción</h3>
+        <h3 className="font-bold text-slate-900">Últimos Registros de Producción</h3>
       </div>
       
       <div className="overflow-x-auto scrollbar-thin">

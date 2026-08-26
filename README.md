@@ -6,6 +6,8 @@ Un sistema web progresivo (PWA) diseñado para la gestión de producción y cál
 ![Arquitectura: Offline First](https://img.shields.io/badge/Arquitectura-Offline_First-emerald)
 ![Stack: React + Supabase](https://img.shields.io/badge/Stack-React_|_Vite_|_Supabase-646CFF)
 
+![LamkSew Admin Dashboard](./docs/images/3-admin-dashboard.png)
+
 ## El Problema y la Solución
 
 **El Contexto:** En los talleres de confección textil, el pago a operarios se realiza comúnmente "a destajo" (por operación completada). Sin embargo, el wifi en los talleres suele ser inestable, y depender de papel o de sistemas cloud tradicionales genera cuellos de botella y pérdida de datos.
