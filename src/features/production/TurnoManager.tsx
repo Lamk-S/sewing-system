@@ -7,6 +7,7 @@ import { supabase } from '../../shared/lib/supabase'
 import { toast } from 'sonner'
 import { Clock, PlayCircle, StopCircle, Users, Activity } from 'lucide-react'
 import { useSyncCatalogs } from '../../shared/hooks/useSyncCatalogs'
+import { calcularDuracionTurno } from './utils/time'
 
 type TurnoConPerfil = {
   id: number;
@@ -151,8 +152,7 @@ export default function TurnoManager() {
       const horaFin = new Date().toISOString()
       
       // INTEGRIDAD: Prevenir horas negativas si el usuario manipuló su reloj
-      const diffMs = new Date(horaFin).getTime() - new Date(turnoActivo.hora_inicio).getTime();
-      const duracion = Math.max(0, diffMs / 3600000);
+      const duracion = calcularDuracionTurno(turnoActivo.hora_inicio, horaFin)
 
       await db.turnos.update(turnoActivo.id, {
         hora_fin: horaFin,
