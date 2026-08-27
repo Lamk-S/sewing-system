@@ -41,7 +41,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }, // 1 año
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }, 
               cacheableResponse: { statuses: [0, 200] }
             }
           },
@@ -68,6 +68,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    pool: 'threads',
   },
   build: {
     chunkSizeWarningLimit: 1000,
