@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Escaneo de dependencias del proyecto (pnpm/npm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Agrupa actualizaciones menores y parches para reducir el ruido de PRs
+    groups:
+      minor-and-patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Escaneo de GitHub Actions usadas en los workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
