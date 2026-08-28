@@ -5,6 +5,7 @@ Un sistema web progresivo (PWA) diseñado para la gestión de producción y cál
 ![Estado: En Desarrollo Activo](https://img.shields.io/badge/Estado-En_Desarrollo-blue)
 ![Arquitectura: Offline First](https://img.shields.io/badge/Arquitectura-Offline_First-emerald)
 ![Stack: React + Supabase](https://img.shields.io/badge/Stack-React_|_Vite_|_Supabase-646CFF)
+![CI Pipeline](https://github.com/Lamk-S/sewing-system/actions/workflows/ci.yml/badge.svg)
 
 ![LamkSew Admin Dashboard](./docs/images/3-admin-dashboard.png)
 
@@ -85,6 +86,21 @@ flowchart TD
 * Políticas RLS (*Row Level Security*)
 * Vistas SQL seguras con `security_invoker = true`
 
+**Testing & CI/CD:**
+
+* [Vitest](https://vitest.dev/) + React Testing Library
+* `fake-indexeddb` (Para pruebas deterministas offline)
+* GitHub Actions (Pipeline automatizado)
+
+## Integración Continua (CI) y Calidad
+
+El proyecto cuenta con un *Quality Gate* automatizado mediante GitHub Actions. Cada Push o Pull Request hacia la rama `main` debe superar obligatoriamente:
+
+1. **Typechecking (`pnpm typecheck`):** Verificación estricta de tipos contra el esquema real de Supabase.
+2. **Análisis Estático (`pnpm lint`):** Validación de reglas de React Hooks y buenas prácticas vía ESLint.
+3. **Testing Automático (`pnpm test:run`):** Pruebas unitarias y de integración enfocadas en aislar lógica de negocio (pagos, cálculos de tiempo) y comprobar las mutaciones offline en Dexie.js.
+4. **Build de Producción (`pnpm build`):** Verificación del empaquetado de Vite y generación del Service Worker.
+
 ## Requisitos e Instalación
 
 1. Clonar el repositorio:
@@ -111,11 +127,12 @@ VITE_SUPABASE_ANON_KEY="tu_anon_key"
 
 ```
 
-4. Ejecutar el servidor de desarrollo:
+4. Scripts principales:
 
 ```bash
-pnpm build
-pnpm preview
+pnpm dev       # Inicia el servidor de desarrollo
+pnpm check     # Ejecuta la suite local completa (Tipos, Lint, Tests y Build)
+pnpm build     # Genera el build de producción
 
 ```
 
@@ -126,6 +143,16 @@ La aplicación nunca confía ciegamente en el cliente. Toda la lógica de autori
 * `Trabajador lee/inserta sus registros`: `WITH CHECK (trabajador_id = auth.uid())`.
 * `Admin gestiona catálogos`: Basado en una función segura `get_user_rol()` que evalúa el perfil autenticado, previniendo elevación de privilegios desde el cliente.
 
+## Documentación Técnica
+
+Para entender el diseño y las decisiones arquitectónicas del sistema, consulta la documentación interna:
+
+* [Arquitectura del Sistema](./docs/architecture.md): Capas, flujos de datos y roles.
+* [Arquitectura Offline-First](./docs/offline-first.md): Qué funciona sin internet y cómo reacciona la aplicación.
+* [Sincronización de Datos](./docs/sync.md): Mecanismo de resolución de conflictos, idempotencia (`local_id`) y casos límite.
+* [Seguridad y Auth](./docs/security.md): RLS, modelo de amenazas y protección de datos.
+* [ADRs (Decisiones Arquitectónicas)](./docs/decisions): Justificaciones de ingeniería (ej. por qué IndexedDB vs Zustand).
+
 ## Estado Actual y Roadmap
 
 El proyecto es totalmente funcional para los flujos principales (producción offline y dashboards), pero sigue en desarrollo activo.
@@ -135,9 +162,9 @@ El proyecto es totalmente funcional para los flujos principales (producción off
 * [x] Sincronización automática a Supabase (Upserts con resolución de duplicados).
 * [x] Dashboard analítico (Admin y Trabajador).
 * [x] Generación de PDF y Excel.
-* [ ] Refactorización a hooks aislados de red para facilitar pruebas unitarias.
+* [x] Suite de pruebas automatizadas (Vitest + RTL) y CI/CD Pipeline.
 * [ ] Despliegue de Live Demo automatizada (Ver plan de implementación en `/docs/demo-planning.md`).
-* [ ] Testing E2E con Playwright simulando cortes de red.
+* [ ] Testing E2E con Playwright simulando cortes de red reales.
 
 ---
 
