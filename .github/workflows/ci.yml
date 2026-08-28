@@ -6,27 +6,48 @@ on:
   pull_request:
     branches: [ main ]
 
+# Cancela ejecuciones en curso si se hace un nuevo push a la misma rama
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Principio de mínimo privilegio: el pipeline solo necesita permisos de lectura
+permissions:
+  contents: read
+
 jobs:
-  build-and-test:
+  quality-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
       - name: Typecheck
         run: pnpm typecheck
+
       - name: Lint
         run: pnpm lint
+
       - name: Test
         run: pnpm test:run
+
       - name: Build
         run: pnpm build
+        env:
+          # Se inyectan variables ficticias por si Vite las exige durante el bundle
+          VITE_SUPABASE_URL: "https://mock-project.supabase.co"
+          VITE_SUPABASE_ANON_KEY: "mock-anon-key-ci-pipeline"
