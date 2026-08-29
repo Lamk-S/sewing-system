@@ -153,18 +153,19 @@ Para entender el diseño y las decisiones arquitectónicas del sistema, consulta
 * [Seguridad y Auth](./docs/security.md): RLS, modelo de amenazas y protección de datos.
 * [ADRs (Decisiones Arquitectónicas)](./docs/decisions): Justificaciones de ingeniería (ej. por qué IndexedDB vs Zustand).
 
-## Estado Actual y Roadmap
+## Roadmap y Estado del Proyecto
 
-El proyecto es totalmente funcional para los flujos principales (producción offline y dashboards), pero sigue en desarrollo activo.
+El proyecto es totalmente funcional para los flujos principales, pero sigue evolucionando. Consulta nuestro [ROADMAP.md](./ROADMAP.md) para ver el progreso detallado, incluyendo implementaciones futuras como Testing E2E con Playwright y el despliegue de una Live Demo automatizada.
 
-* [x] Autenticación y control de roles.
-* [x] Motor offline-first con Dexie.js.
-* [x] Sincronización automática a Supabase (Upserts con resolución de duplicados).
-* [x] Dashboard analítico (Admin y Trabajador).
-* [x] Generación de PDF y Excel.
-* [x] Suite de pruebas automatizadas (Vitest + RTL) y CI/CD Pipeline.
-* [ ] Despliegue de Live Demo automatizada (Ver plan de implementación en `/docs/demo-planning.md`).
-* [ ] Testing E2E con Playwright simulando cortes de red reales.
+## Contribución y Open Source
+
+Este proyecto es Open Source. Si deseas contribuir (reportar bugs, sugerir funcionalidades o mejorar el código), por favor lee nuestra [Guía de Contribución](./CONTRIBUTING.md) y nuestro [Código de Conducta](./CODE_OF_CONDUCT.md).
+
+**Recuerda:** Cualquier PR que afecte flujos de trabajo debe mantener compatibilidad estricta con el entorno **Offline-First**.
+
+## Licencia
+
+Este proyecto está distribuido bajo la licencia MIT. Consulta el archivo [LICENSE](./LICENSE) para más información.
 
 ---
 

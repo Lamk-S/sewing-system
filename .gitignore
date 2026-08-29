@@ -7,7 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node modules (¡Muy importante que no se suban!)
+# Node modules y builds (¡Muy importante que no se suban!)
 node_modules
 dist
 dist-ssr
@@ -26,6 +26,7 @@ dist-ssr
 
 # Vite y TypeScript
 tsconfig.tsbuildinfo
+.tmp/
 
 # Archivos de entorno (¡AQUÍ ESTÁ LA SEGURIDAD DE SUPABASE!)
 .env
@@ -35,3 +36,9 @@ tsconfig.tsbuildinfo
 # Archivos de caché
 .eslintcache
 .stylelintcache
+
+# Testing & QA (Vitest, Playwright, Lighthouse)
+coverage/
+playwright-report/
+test-results/
+.lighthouseci/

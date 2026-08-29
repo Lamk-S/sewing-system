@@ -11,7 +11,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "check": "pnpm typecheck && pnpm lint && pnpm test:run && pnpm build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
@@ -41,6 +43,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/cli": "^4.2.1",
     "@tailwindcss/postcss": "^4.2.1",
     "@testing-library/jest-dom": "^7.0.1",
