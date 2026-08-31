@@ -14,12 +14,15 @@ export type RegistroLocal = Omit<Database['public']['Tables']['registros_producc
   sync_status: SyncStatus;
   talla?: string | null;
   lote?: string | null;
+  precio_aplicado: number;
 };
 
-export type TurnoLocal = Omit<Database['public']['Tables']['turnos']['Row'], 'id' | 'hora_fin' | 'total_horas'> & {
+export type TurnoLocal = Omit<Database['public']['Tables']['turnos']['Row'], 'id' | 'hora_fin' | 'total_horas' | 'es_anomalo' | 'server_sync_time'> & {
   id?: number; // Auto-incremental de Dexie
   hora_fin?: string | null;
   total_horas?: number | null;
+  es_anomalo?: boolean | null;
+  server_sync_time?: string | null;
   sync_status: SyncStatus;
 };
 
@@ -42,6 +45,14 @@ export class SewingDatabase extends Dexie {
     });
 
     this.version(3).stores({
+      prendas: 'id, activo',
+      operaciones: 'id, prenda_id, activo',
+      colores: 'id, activo',
+      registros_produccion: '++id, &local_id, trabajador_id, sync_status, fecha_trabajo',
+      turnos: '++id, &local_id, trabajador_id, fecha, estado, sync_status'
+    });
+
+    this.version(4).stores({
       prendas: 'id, activo',
       operaciones: 'id, prenda_id, activo',
       colores: 'id, activo',
