@@ -33,19 +33,38 @@ export function useSyncCatalogs() {
           local_id: r.local_id,
           lote: r.lote,
           operacion_id: r.operacion_id,
+          precio_aplicado: r.precio_aplicado,
           talla: r.talla,
           trabajador_id: r.trabajador_id,
         }));
 
-        const { error: errReg } = await supabase
+        // Intento 1: Inserción Masiva
+        const { error: bulkError } = await supabase
           .from('registros_produccion')
           .upsert(payloadReg, { onConflict: 'local_id' });
 
-        if (!errReg) {
+        if (!bulkError) {
+          // Éxito masivo
           await db.registros_produccion.bulkUpdate(
             registrosPendientes.map(r => ({ key: r.id!, changes: { sync_status: 'synced' as const } }))
           );
           itemsSubidos += registrosPendientes.length;
+        } else {
+          // Intento 2: Fallback Inserción Individual (Aislamiento de fallos)
+          console.warn('Fallo en sincronización masiva, intentando uno por uno...', bulkError);
+          for (const reg of payloadReg) {
+            const { error: singleError } = await supabase
+              .from('registros_produccion')
+              .upsert(reg, { onConflict: 'local_id' });
+              
+            const localRecord = registrosPendientes.find(r => r.local_id === reg.local_id);
+            if (!singleError && localRecord?.id) {
+              await db.registros_produccion.update(localRecord.id, { sync_status: 'synced' });
+              itemsSubidos++;
+            } else if (localRecord?.id) {
+              console.error(`Fallo crítico al subir bulto ${reg.local_id}`);
+            }
+          }
         }
       }
 
@@ -56,8 +75,8 @@ export function useSyncCatalogs() {
           hora_fin: t.hora_fin,
           hora_inicio: t.hora_inicio,
           local_id: t.local_id,
-          total_horas: t.total_horas,
           trabajador_id: t.trabajador_id,
+          total_horas: t.total_horas
         }));
 
         const { error: errTurnos } = await supabase
@@ -80,9 +99,9 @@ export function useSyncCatalogs() {
       // 2. SYNC DOWN (Descargar catálogos usando TRANSACCIÓN)
       // ======================================================
       const [resPrendas, resOperaciones, resColores] = await Promise.all([
-        supabase.from('prendas').select('*').eq('activo', true),
-        supabase.from('operaciones').select('*').eq('activo', true),
-        supabase.from('colores').select('*').eq('activo', true)
+        supabase.from('prendas').select('*'),
+        supabase.from('operaciones').select('*'), 
+        supabase.from('colores').select('*')
       ]);
 
       if (resPrendas.error || resOperaciones.error || resColores.error) {
@@ -94,9 +113,9 @@ export function useSyncCatalogs() {
         await db.operaciones.clear();
         await db.colores.clear();
 
-        if (resPrendas.data?.length) await db.prendas.bulkAdd(resPrendas.data);
-        if (resOperaciones.data?.length) await db.operaciones.bulkAdd(resOperaciones.data);
-        if (resColores.data?.length) await db.colores.bulkAdd(resColores.data);
+        if (resPrendas.data?.length) await db.prendas.bulkPut(resPrendas.data);
+        if (resOperaciones.data?.length) await db.operaciones.bulkPut(resOperaciones.data);
+        if (resColores.data?.length) await db.colores.bulkPut(resColores.data);
       });
 
     } catch (error) {
