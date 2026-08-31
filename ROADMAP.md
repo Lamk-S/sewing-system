@@ -13,6 +13,7 @@ Este documento refleja el estado actual del proyecto, los hitos alcanzados y las
 * [x] Documentación técnica integral (`docs/`).
 * [x] Testing End-to-End (E2E): Implementación de Playwright simulando `context.setOffline(true)` para validar resiliencia de red.
 * [x] Auditoría PWA y Performance base mediante Lighthouse CI.
+* [x] Hardening Integral (Production-Ready) Inmutabilidad financiera (snapshots de precios), protección anti-fraude de tiempo (Server-side triggers), e idempotencia estricta en sincronización asíncrona.
 
 **Producto (Features)**
 * [x] Autenticación y Autorización basada en Roles (Supabase Auth + RLS).

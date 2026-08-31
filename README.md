@@ -18,11 +18,12 @@ Un sistema web progresivo (PWA) diseñado para la gestión de producción y cál
 ## Características Principales
 
 *   **100% Offline-First (Operarios):** Registro de producción, inicio/fin de turnos y lectura de catálogos sin conexión a internet.
-*   **Sincronización Resiliente:** Uso de UUIDs locales (`local_id`) para evitar duplicidad durante los *upserts* asíncronos en la nube.
+*   **Sincronización Resiliente:** Uso de UUIDs locales (`local_id`) para evitar duplicidad durante los *upserts* asíncronos en la nube, con fallback de recuperación ante fallos de integridad por lotes.
+*   **Auditoría y Anti-Fraude:** Protección contra manipulación del reloj del dispositivo (*Time Spoofing*) mediante Triggers de validación temporal en PostgreSQL, e inmutabilidad financiera garantizada en el historial.
 *   **Control de Asistencia:** Trazabilidad estricta de turnos para calcular la eficiencia real ($/hora).
 *   **Dashboard Administrativo (Tiempo Real):** Ranking de producción, eficiencia por operario, y exportación a PDF/Excel.
 *   **PWA Instalable:** Experiencia nativa en tablets y móviles, con caché de assets estáticos y fuentes.
-*   **Seguridad y RBAC:** Row Level Security (RLS) en PostgreSQL, garantizando que un operario solo pueda insertar/leer sus propios registros.
+*   **Seguridad y RBAC:** Row Level Security (RLS) en PostgreSQL, garantizando que un operario solo pueda insertar/actualizar sus propios registros pendientes.
 
 ## Arquitectura y Flujo de Datos
 
@@ -138,10 +139,11 @@ pnpm build     # Genera el build de producción
 
 ## Seguridad en Base de Datos
 
-La aplicación nunca confía ciegamente en el cliente. Toda la lógica de autorización reside en la base de datos de Supabase mediante RLS:
+La aplicación nunca confía ciegamente en el cliente (Zero Trust). Toda la lógica crítica de autorización y auditoría reside en la base de datos de Supabase:
 
-* `Trabajador lee/inserta sus registros`: `WITH CHECK (trabajador_id = auth.uid())`.
-* `Admin gestiona catálogos`: Basado en una función segura `get_user_rol()` que evalúa el perfil autenticado, previniendo elevación de privilegios desde el cliente.
+* **Protección de Datos (RLS):** Los operarios solo pueden leer, insertar y actualizar (para idempotencia de sync) sus propios registros pendientes mediante `WITH CHECK (trabajador_id = auth.uid())`.
+* **Elevación de Privilegios:** Bloqueada. La UI se adapta al rol, pero las operaciones se validan con una función segura `get_user_rol()` directamente en el token JWT y PostgreSQL.
+* **Validación Temporal y Financiera:** Los registros capturan el precio exacto en el momento de la confección (`precio_aplicado`) para evitar mutaciones retroactivas, y los tiempos de los turnos son auditados por Triggers que detectan alteraciones en el reloj del OS del cliente.
 
 ## Documentación Técnica
 

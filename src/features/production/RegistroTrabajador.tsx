@@ -53,10 +53,13 @@ export default function RegistroTrabajador() {
 
     const cantNumerica = Number(cantidad)
     if (!cantidad || isNaN(cantNumerica) || cantNumerica <= 0 || !Number.isInteger(cantNumerica)) {
-      toast.error("Ingresa una cantidad de piezas válida (número entero positivo).")
+      toast.error("Ingresa una cantidad de piezas válida.")
       cantidadInputRef.current?.focus()
       return
     }
+
+    const operacionSeleccionada = (operaciones || []).find(o => String(o.id) === operacionId)
+    const precioActual = operacionSeleccionada?.precio_fijo || 0
 
     setIsSaving(true)
     try {
@@ -65,9 +68,10 @@ export default function RegistroTrabajador() {
         trabajador_id: session.user.id,
         operacion_id: Number(operacionId),
         color_id: Number(colorId),
-        cantidad: cantNumerica, // Seguro
+        cantidad: cantNumerica,
         talla: talla,
         lote: lote.trim().toUpperCase(),
+        precio_aplicado: precioActual,
         fecha_trabajo: turnoActivo.fecha,
         sync_status: 'pending',
         created_at: new Date().toISOString()
